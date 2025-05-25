@@ -39,14 +39,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [user, setUser] = useState<any>(null);
-
   useEffect(() => {
     // Check authentication status
     const authStatus = isAuthenticated();
     setIsAuthChecked(true);
 
     if (authStatus) {
-      setUser(getCurrentUser());
+      const currentUser = getCurrentUser();
+      setUser(currentUser);
+
+      // Verify user is admin, redirect if not
+      if (!currentUser?.is_admin) {
+        router.push("/unauthorized");
+      }
     } else {
       // Redirect to login if not authenticated
       router.push("/login");

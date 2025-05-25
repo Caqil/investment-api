@@ -166,19 +166,27 @@ export async function verifyEmail(data: VerifyEmailRequest): Promise<void> {
   }
 }
 
-// Login user
+// admin/lib/auth.ts - Update login function
 export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
   try {
     const response = await api.post<AuthResponse>('/auth/login', data);
     
-    // Store auth data in localStorage - carefully to avoid circular references
+    // Store auth data in localStorage and cookies
     if (typeof window !== 'undefined') {
+      // Store token
       localStorage.setItem(TOKEN_KEY, response.data.token);
       
-      // Clone the user object and remove any potential circular references
+      // Store user data
       const safeUser = { ...response.data.user };
+      console.log("Logged in user data:", safeUser); // Debug log
+      console.log("Is admin:", safeUser.is_admin); // Specifically check admin status
+      
       localStorage.setItem(USER_KEY, JSON.stringify(safeUser));
       localStorage.setItem('device_id', data.device_id);
+      
+      // Set cookies for middleware
+      document.cookie = `auth_token=${response.data.token}; path=/; max-age=604800`;
+      document.cookie = `user_data=${encodeURIComponent(JSON.stringify(safeUser))}; path=/; max-age=604800`;
     }
     
     return response.data;
@@ -187,15 +195,15 @@ export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
   }
 }
 
-// Logout user
 export function logout(): void {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
     // We keep device_id for future logins
     
-    // Remove auth cookie
+    // Remove auth cookies
     document.cookie = 'auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = 'user_data=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     
     // Redirect to login page
     window.location.href = '/login';
