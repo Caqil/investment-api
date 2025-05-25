@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/Caqil/investment-api/internal/middleware"
+	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/Caqil/investment-api/internal/service"
 	"github.com/gin-gonic/gin"
 )

@@ -11,6 +11,9 @@ type NotificationRepository struct {
 	db *sql.DB
 }
 
+func (r *NotificationRepository) GetDB() *sql.DB {
+	return r.db
+}
 func NewNotificationRepository(db *sql.DB) *NotificationRepository {
 	return &NotificationRepository{
 		db: db,

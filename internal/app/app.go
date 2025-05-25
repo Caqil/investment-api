@@ -61,9 +61,31 @@ func (a *App) SetupRoutes() *gin.Engine {
 	userService := service.NewUserService(userRepo, deviceRepo)
 	planService := service.NewPlanService(planRepo)
 	paymentService := service.NewPaymentService(paymentRepo, transactionRepo, userRepo, a.config.Payment)
-	bonusService := service.NewBonusService(userRepo, transactionRepo, a.config.App)
+	bonusService := service.NewBonusService(
+		userRepo,
+		transactionRepo,
+		struct {
+			DailyBonusPercentage     float64
+			ReferralBonusAmount      float64
+			ReferralProfitPercentage float64
+		}{
+			DailyBonusPercentage:     a.config.App.DailyBonusPercentage,
+			ReferralBonusAmount:      a.config.App.ReferralBonusAmount,
+			ReferralProfitPercentage: a.config.App.ReferralProfitPercentage,
+		},
+	)
 	taskService := service.NewTaskService(taskRepo)
-	withdrawalService := service.NewWithdrawalService(withdrawalRepo, transactionRepo, userRepo, taskService, a.config.App)
+	withdrawalService := service.NewWithdrawalService(
+		withdrawalRepo,
+		transactionRepo,
+		userRepo,
+		taskService,
+		struct {
+			MinimumWithdrawalAmount float64
+		}{
+			MinimumWithdrawalAmount: a.config.App.MinimumWithdrawalAmount,
+		},
+	)
 	kycService := service.NewKYCService(kycRepo, userRepo)
 	notificationService := service.NewNotificationService(notificationRepo, emailService)
 
