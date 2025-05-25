@@ -2,6 +2,8 @@ package model
 
 import (
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type TicketStatus string
@@ -17,25 +19,27 @@ const (
 )
 
 type SupportTicket struct {
-	ID        int64        `json:"id" db:"id"`
-	UserID    int64        `json:"user_id" db:"user_id"`
-	Subject   string       `json:"subject" db:"subject"`
-	Message   string       `json:"message" db:"message"`
-	Status    TicketStatus `json:"status" db:"status"`
-	CreatedAt time.Time    `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at" db:"updated_at"`
+	ID        int64              `json:"id" bson:"id"`
+	ObjectID  primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	UserID    int64              `json:"user_id" bson:"user_id"`
+	Subject   string             `json:"subject" bson:"subject"`
+	Message   string             `json:"message" bson:"message"`
+	Status    TicketStatus       `json:"status" bson:"status"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
 
 	// Populated fields (not from database)
-	Messages []*SupportMessage `json:"messages,omitempty" db:"-"`
+	Messages []*SupportMessage `json:"messages,omitempty" bson:"-"`
 }
 
 type SupportMessage struct {
-	ID         int64      `json:"id" db:"id"`
-	TicketID   int64      `json:"ticket_id" db:"ticket_id"`
-	SenderType SenderType `json:"sender_type" db:"sender_type"`
-	SenderID   int64      `json:"sender_id" db:"sender_id"`
-	Message    string     `json:"message" db:"message"`
-	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
+	ID         int64              `json:"id" bson:"id"`
+	ObjectID   primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	TicketID   int64              `json:"ticket_id" bson:"ticket_id"`
+	SenderType SenderType         `json:"sender_type" bson:"sender_type"`
+	SenderID   int64              `json:"sender_id" bson:"sender_id"`
+	Message    string             `json:"message" bson:"message"`
+	CreatedAt  time.Time          `json:"created_at" bson:"created_at"`
 }
 
 type SupportTicketResponse struct {

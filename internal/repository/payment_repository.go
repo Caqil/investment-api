@@ -1,178 +1,108 @@
 package repository
 
 import (
-	"database/sql"
-	"encoding/json"
+	"context"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type PaymentRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-func NewPaymentRepository(db *sql.DB) *PaymentRepository {
+func NewPaymentRepository(conn *database.MongoDBConnection) *PaymentRepository {
 	return &PaymentRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("payments"),
 	}
 }
 
 // GetDB returns the database connection
-func (r *PaymentRepository) GetDB() *sql.DB {
+func (r *PaymentRepository) GetDB() *mongo.Database {
 	return r.db
 }
 
 func (r *PaymentRepository) Create(payment *model.Payment) (*model.Payment, error) {
-	query := `
-		INSERT INTO payments (
-			transaction_id, gateway, gateway_reference, currency, amount,
-			status, metadata, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// Convert metadata to JSON
-	metadataJSON, err := json.Marshal(payment.Metadata)
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "payment_id")
 	if err != nil {
 		return nil, err
 	}
 
+	// Set payment ID and timestamps
+	payment.ID = id
 	now := time.Now()
 	payment.CreatedAt = now
 	payment.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		payment.TransactionID,
-		payment.Gateway,
-		payment.GatewayReference,
-		payment.Currency,
-		payment.Amount,
-		payment.Status,
-		metadataJSON,
-		payment.CreatedAt,
-		payment.UpdatedAt,
-	)
+	// Insert payment
+	result, err := r.collection.InsertOne(ctx, payment)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		payment.ObjectID = oid
 	}
 
-	payment.ID = id
 	return payment, nil
 }
 
 func (r *PaymentRepository) FindByID(id int64) (*model.Payment, error) {
-	query := `
-		SELECT * FROM payments WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var payment model.Payment
-	var metadataJSON []byte
-
-	err := r.db.QueryRow(query, id).Scan(
-		&payment.ID,
-		&payment.TransactionID,
-		&payment.Gateway,
-		&payment.GatewayReference,
-		&payment.Currency,
-		&payment.Amount,
-		&payment.Status,
-		&metadataJSON,
-		&payment.CreatedAt,
-		&payment.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&payment)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	// Parse metadata JSON
-	var metadata model.JSON
-	if err := json.Unmarshal(metadataJSON, &metadata); err != nil {
-		return nil, err
-	}
-	payment.Metadata = metadata
 
 	return &payment, nil
 }
 
 func (r *PaymentRepository) FindByTransactionID(transactionID int64) (*model.Payment, error) {
-	query := `
-		SELECT * FROM payments WHERE transaction_id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var payment model.Payment
-	var metadataJSON []byte
-
-	err := r.db.QueryRow(query, transactionID).Scan(
-		&payment.ID,
-		&payment.TransactionID,
-		&payment.Gateway,
-		&payment.GatewayReference,
-		&payment.Currency,
-		&payment.Amount,
-		&payment.Status,
-		&metadataJSON,
-		&payment.CreatedAt,
-		&payment.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"transaction_id": transactionID}).Decode(&payment)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	// Parse metadata JSON
-	var metadata model.JSON
-	if err := json.Unmarshal(metadataJSON, &metadata); err != nil {
-		return nil, err
-	}
-	payment.Metadata = metadata
 
 	return &payment, nil
 }
 
 func (r *PaymentRepository) FindByGatewayReference(gatewayReference string) (*model.Payment, error) {
-	query := `
-		SELECT * FROM payments WHERE gateway_reference = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var payment model.Payment
-	var metadataJSON []byte
-
-	err := r.db.QueryRow(query, gatewayReference).Scan(
-		&payment.ID,
-		&payment.TransactionID,
-		&payment.Gateway,
-		&payment.GatewayReference,
-		&payment.Currency,
-		&payment.Amount,
-		&payment.Status,
-		&metadataJSON,
-		&payment.CreatedAt,
-		&payment.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"gateway_reference": gatewayReference}).Decode(&payment)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	// Parse metadata JSON
-	var metadata model.JSON
-	if err := json.Unmarshal(metadataJSON, &metadata); err != nil {
-		return nil, err
-	}
-	payment.Metadata = metadata
 
 	return &payment, nil
 }
@@ -182,51 +112,31 @@ func (r *PaymentRepository) FindByGatewayAndStatus(
 	status model.PaymentStatus,
 	limit, offset int,
 ) ([]*model.Payment, error) {
-	query := `
-		SELECT * FROM payments 
-		WHERE gateway = ? AND status = ? 
-		ORDER BY created_at DESC 
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, gateway, status, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx,
+		bson.M{
+			"gateway": gateway,
+			"status":  status,
+		},
+		options,
+	)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var payments []*model.Payment
-	for rows.Next() {
-		var payment model.Payment
-		var metadataJSON []byte
-
-		err := rows.Scan(
-			&payment.ID,
-			&payment.TransactionID,
-			&payment.Gateway,
-			&payment.GatewayReference,
-			&payment.Currency,
-			&payment.Amount,
-			&payment.Status,
-			&metadataJSON,
-			&payment.CreatedAt,
-			&payment.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Parse metadata JSON
-		var metadata model.JSON
-		if err := json.Unmarshal(metadataJSON, &metadata); err != nil {
-			return nil, err
-		}
-		payment.Metadata = metadata
-
-		payments = append(payments, &payment)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &payments); err != nil {
 		return nil, err
 	}
 
@@ -234,68 +144,50 @@ func (r *PaymentRepository) FindByGatewayAndStatus(
 }
 
 func (r *PaymentRepository) Update(payment *model.Payment) error {
-	query := `
-		UPDATE payments SET
-			transaction_id = ?,
-			gateway = ?,
-			gateway_reference = ?,
-			currency = ?,
-			amount = ?,
-			status = ?,
-			metadata = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
-
-	// Convert metadata to JSON
-	metadataJSON, err := json.Marshal(payment.Metadata)
-	if err != nil {
-		return err
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	payment.UpdatedAt = time.Now()
 
-	_, err = r.db.Exec(
-		query,
-		payment.TransactionID,
-		payment.Gateway,
-		payment.GatewayReference,
-		payment.Currency,
-		payment.Amount,
-		payment.Status,
-		metadataJSON,
-		payment.UpdatedAt,
-		payment.ID,
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": payment.ID},
+		bson.M{"$set": payment},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *PaymentRepository) UpdateStatus(id int64, status model.PaymentStatus) error {
-	query := `
-		UPDATE payments SET
-			status = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, status, time.Now(), id)
-	if err != nil {
-		return err
-	}
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": id},
+		bson.M{
+			"$set": bson.M{
+				"status":     status,
+				"updated_at": time.Now(),
+			},
+		},
+	)
 
-	return nil
+	return err
 }
 
 // CountByGatewayAndStatus counts the number of payments with a specific gateway and status
-func (r *PaymentRepository) CountByGatewayAndStatus(gateway model.PaymentGateway, status model.PaymentStatus) (int, error) {
-	var count int
-	err := r.db.QueryRow("SELECT COUNT(*) FROM payments WHERE gateway = ? AND status = ?", gateway, status).Scan(&count)
+func (r *PaymentRepository) CountByGatewayAndStatus(gateway model.PaymentGateway, status model.PaymentStatus) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{
+		"gateway": gateway,
+		"status":  status,
+	})
 	if err != nil {
 		return 0, err
 	}
+
 	return count, nil
 }

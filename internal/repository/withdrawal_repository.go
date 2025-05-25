@@ -1,157 +1,100 @@
 package repository
 
 import (
-	"database/sql"
-	"encoding/json"
+	"context"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type WithdrawalRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-func NewWithdrawalRepository(db *sql.DB) *WithdrawalRepository {
+func NewWithdrawalRepository(conn *database.MongoDBConnection) *WithdrawalRepository {
 	return &WithdrawalRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("withdrawals"),
 	}
 }
 
 // GetDB returns the database connection
-func (r *WithdrawalRepository) GetDB() *sql.DB {
+func (r *WithdrawalRepository) GetDB() *mongo.Database {
 	return r.db
 }
 
 func (r *WithdrawalRepository) Create(withdrawal *model.Withdrawal) (*model.Withdrawal, error) {
-	query := `
-		INSERT INTO withdrawals (
-			transaction_id, user_id, amount, payment_method, payment_details,
-			status, admin_note, tasks_completed, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	// Convert payment details to JSON
-	paymentDetailsJSON, err := json.Marshal(withdrawal.PaymentDetails)
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "withdrawal_id")
 	if err != nil {
 		return nil, err
 	}
 
+	// Set withdrawal ID and timestamps
+	withdrawal.ID = id
 	now := time.Now()
 	withdrawal.CreatedAt = now
 	withdrawal.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		withdrawal.TransactionID,
-		withdrawal.UserID,
-		withdrawal.Amount,
-		withdrawal.PaymentMethod,
-		paymentDetailsJSON,
-		withdrawal.Status,
-		withdrawal.AdminNote,
-		withdrawal.TasksCompleted,
-		withdrawal.CreatedAt,
-		withdrawal.UpdatedAt,
-	)
+	// Insert withdrawal
+	result, err := r.collection.InsertOne(ctx, withdrawal)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		withdrawal.ObjectID = oid
 	}
 
-	withdrawal.ID = id
 	return withdrawal, nil
 }
 
 func (r *WithdrawalRepository) FindByID(id int64) (*model.Withdrawal, error) {
-	query := `
-		SELECT * FROM withdrawals WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var withdrawal model.Withdrawal
-	var paymentDetailsJSON []byte
-
-	err := r.db.QueryRow(query, id).Scan(
-		&withdrawal.ID,
-		&withdrawal.TransactionID,
-		&withdrawal.UserID,
-		&withdrawal.Amount,
-		&withdrawal.PaymentMethod,
-		&paymentDetailsJSON,
-		&withdrawal.Status,
-		&withdrawal.AdminNote,
-		&withdrawal.TasksCompleted,
-		&withdrawal.CreatedAt,
-		&withdrawal.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&withdrawal)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
 	}
 
-	// Parse payment details JSON
-	var paymentDetails model.PaymentDetails
-	if err := json.Unmarshal(paymentDetailsJSON, &paymentDetails); err != nil {
-		return nil, err
-	}
-	withdrawal.PaymentDetails = paymentDetails
-
 	return &withdrawal, nil
 }
 
 func (r *WithdrawalRepository) FindByUserID(userID int64, limit, offset int) ([]*model.Withdrawal, error) {
-	query := `
-		SELECT * FROM withdrawals 
-		WHERE user_id = ? 
-		ORDER BY created_at DESC 
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, userID, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{"user_id": userID}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var withdrawals []*model.Withdrawal
-	for rows.Next() {
-		var withdrawal model.Withdrawal
-		var paymentDetailsJSON []byte
-
-		err := rows.Scan(
-			&withdrawal.ID,
-			&withdrawal.TransactionID,
-			&withdrawal.UserID,
-			&withdrawal.Amount,
-			&withdrawal.PaymentMethod,
-			&paymentDetailsJSON,
-			&withdrawal.Status,
-			&withdrawal.AdminNote,
-			&withdrawal.TasksCompleted,
-			&withdrawal.CreatedAt,
-			&withdrawal.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Parse payment details JSON
-		var paymentDetails model.PaymentDetails
-		if err := json.Unmarshal(paymentDetailsJSON, &paymentDetails); err != nil {
-			return nil, err
-		}
-		withdrawal.PaymentDetails = paymentDetails
-
-		withdrawals = append(withdrawals, &withdrawal)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &withdrawals); err != nil {
 		return nil, err
 	}
 
@@ -159,52 +102,25 @@ func (r *WithdrawalRepository) FindByUserID(userID int64, limit, offset int) ([]
 }
 
 func (r *WithdrawalRepository) FindByStatus(status model.WithdrawalStatus, limit, offset int) ([]*model.Withdrawal, error) {
-	query := `
-		SELECT * FROM withdrawals 
-		WHERE status = ? 
-		ORDER BY created_at DESC 
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, status, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{"status": status}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var withdrawals []*model.Withdrawal
-	for rows.Next() {
-		var withdrawal model.Withdrawal
-		var paymentDetailsJSON []byte
-
-		err := rows.Scan(
-			&withdrawal.ID,
-			&withdrawal.TransactionID,
-			&withdrawal.UserID,
-			&withdrawal.Amount,
-			&withdrawal.PaymentMethod,
-			&paymentDetailsJSON,
-			&withdrawal.Status,
-			&withdrawal.AdminNote,
-			&withdrawal.TasksCompleted,
-			&withdrawal.CreatedAt,
-			&withdrawal.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Parse payment details JSON
-		var paymentDetails model.PaymentDetails
-		if err := json.Unmarshal(paymentDetailsJSON, &paymentDetails); err != nil {
-			return nil, err
-		}
-		withdrawal.PaymentDetails = paymentDetails
-
-		withdrawals = append(withdrawals, &withdrawal)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &withdrawals); err != nil {
 		return nil, err
 	}
 
@@ -212,170 +128,105 @@ func (r *WithdrawalRepository) FindByStatus(status model.WithdrawalStatus, limit
 }
 
 func (r *WithdrawalRepository) FindAll(limit, offset int) ([]*model.Withdrawal, error) {
-	query := `
-		SELECT * FROM withdrawals 
-		ORDER BY created_at DESC 
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var withdrawals []*model.Withdrawal
-	for rows.Next() {
-		var withdrawal model.Withdrawal
-		var paymentDetailsJSON []byte
-
-		err := rows.Scan(
-			&withdrawal.ID,
-			&withdrawal.TransactionID,
-			&withdrawal.UserID,
-			&withdrawal.Amount,
-			&withdrawal.PaymentMethod,
-			&paymentDetailsJSON,
-			&withdrawal.Status,
-			&withdrawal.AdminNote,
-			&withdrawal.TasksCompleted,
-			&withdrawal.CreatedAt,
-			&withdrawal.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		// Parse payment details JSON
-		var paymentDetails model.PaymentDetails
-		if err := json.Unmarshal(paymentDetailsJSON, &paymentDetails); err != nil {
-			return nil, err
-		}
-		withdrawal.PaymentDetails = paymentDetails
-
-		withdrawals = append(withdrawals, &withdrawal)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &withdrawals); err != nil {
 		return nil, err
 	}
 
 	return withdrawals, nil
 }
 
-func (r *WithdrawalRepository) CountByStatus(status model.WithdrawalStatus) (int, error) {
-	var count int
-	err := r.db.QueryRow("SELECT COUNT(*) FROM withdrawals WHERE status = ?", status).Scan(&count)
+func (r *WithdrawalRepository) CountByStatus(status model.WithdrawalStatus) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{"status": status})
 	if err != nil {
 		return 0, err
 	}
+
 	return count, nil
 }
 
-func (r *WithdrawalRepository) CountByUserID(userID int64) (int, error) {
-	var count int
-	err := r.db.QueryRow("SELECT COUNT(*) FROM withdrawals WHERE user_id = ?", userID).Scan(&count)
+func (r *WithdrawalRepository) CountByUserID(userID int64) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{"user_id": userID})
 	if err != nil {
 		return 0, err
 	}
+
 	return count, nil
 }
 
 func (r *WithdrawalRepository) Update(withdrawal *model.Withdrawal) error {
-	query := `
-		UPDATE withdrawals SET
-			transaction_id = ?,
-			user_id = ?,
-			amount = ?,
-			payment_method = ?,
-			payment_details = ?,
-			status = ?,
-			admin_note = ?,
-			tasks_completed = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
-
-	// Convert payment details to JSON
-	paymentDetailsJSON, err := json.Marshal(withdrawal.PaymentDetails)
-	if err != nil {
-		return err
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	withdrawal.UpdatedAt = time.Now()
 
-	_, err = r.db.Exec(
-		query,
-		withdrawal.TransactionID,
-		withdrawal.UserID,
-		withdrawal.Amount,
-		withdrawal.PaymentMethod,
-		paymentDetailsJSON,
-		withdrawal.Status,
-		withdrawal.AdminNote,
-		withdrawal.TasksCompleted,
-		withdrawal.UpdatedAt,
-		withdrawal.ID,
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": withdrawal.ID},
+		bson.M{"$set": withdrawal},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *WithdrawalRepository) UpdateStatus(id int64, status model.WithdrawalStatus, adminNote string) error {
-	query := `
-		UPDATE withdrawals SET
-			status = ?,
-			admin_note = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, status, adminNote, time.Now(), id)
-	if err != nil {
-		return err
+	update := bson.M{
+		"status":     status,
+		"updated_at": time.Now(),
 	}
 
-	return nil
+	if adminNote != "" {
+		update["admin_note"] = adminNote
+	}
+
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": id},
+		bson.M{"$set": update},
+	)
+
+	return err
 }
 
 // FindByTransactionID finds a withdrawal by transaction ID
 func (r *WithdrawalRepository) FindByTransactionID(transactionID int64) (*model.Withdrawal, error) {
-	query := `
-		SELECT * FROM withdrawals WHERE transaction_id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var withdrawal model.Withdrawal
-	var paymentDetailsJSON []byte
-
-	err := r.db.QueryRow(query, transactionID).Scan(
-		&withdrawal.ID,
-		&withdrawal.TransactionID,
-		&withdrawal.UserID,
-		&withdrawal.Amount,
-		&withdrawal.PaymentMethod,
-		&paymentDetailsJSON,
-		&withdrawal.Status,
-		&withdrawal.AdminNote,
-		&withdrawal.TasksCompleted,
-		&withdrawal.CreatedAt,
-		&withdrawal.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"transaction_id": transactionID}).Decode(&withdrawal)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
 	}
-
-	// Parse payment details JSON
-	var paymentDetails model.PaymentDetails
-	if err := json.Unmarshal(paymentDetailsJSON, &paymentDetails); err != nil {
-		return nil, err
-	}
-	withdrawal.PaymentDetails = paymentDetails
 
 	return &withdrawal, nil
 }

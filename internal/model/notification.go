@@ -2,6 +2,8 @@ package model
 
 import (
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type NotificationType string
@@ -14,14 +16,15 @@ const (
 )
 
 type Notification struct {
-	ID        int64            `json:"id" db:"id"`
-	UserID    int64            `json:"user_id" db:"user_id"`
-	Title     string           `json:"title" db:"title"`
-	Message   string           `json:"message" db:"message"`
-	Type      NotificationType `json:"type" db:"type"`
-	IsRead    bool             `json:"is_read" db:"is_read"`
-	CreatedAt time.Time        `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time        `json:"updated_at" db:"updated_at"`
+	ID        int64              `json:"id" bson:"id"`
+	ObjectID  primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	UserID    int64              `json:"user_id" bson:"user_id"`
+	Title     string             `json:"title" bson:"title"`
+	Message   string             `json:"message" bson:"message"`
+	Type      NotificationType   `json:"type" bson:"type"`
+	IsRead    bool               `json:"is_read" bson:"is_read"`
+	CreatedAt time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 type NotificationResponse struct {

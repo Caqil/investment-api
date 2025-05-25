@@ -1,97 +1,71 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type UserRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-func (r *UserRepository) GetDB() *sql.DB {
-	return r.db
-}
-func NewUserRepository(db *sql.DB) *UserRepository {
+func NewUserRepository(conn *database.MongoDBConnection) *UserRepository {
 	return &UserRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("users"),
 	}
 }
 
-func (r *UserRepository) Create(user *model.User) (*model.User, error) {
-	query := `
-		INSERT INTO users (
-			name, email, password_hash, phone, balance, referral_code, 
-			referred_by, plan_id, is_kyc_verified, email_verified, is_admin, 
-			is_blocked, biometric_enabled, profile_pic_url, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+func (r *UserRepository) GetDB() *mongo.Database {
+	return r.db
+}
 
+func (r *UserRepository) Create(user *model.User) (*model.User, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "user_id")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set user ID and timestamps
+	user.ID = id
 	now := time.Now()
 	user.CreatedAt = now
 	user.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		user.Name,
-		user.Email,
-		user.PasswordHash,
-		user.Phone,
-		user.Balance,
-		user.ReferralCode,
-		user.ReferredBy,
-		user.PlanID,
-		user.IsKYCVerified,
-		user.EmailVerified,
-		user.IsAdmin,
-		user.IsBlocked,
-		user.BiometricEnabled,
-		user.ProfilePicURL,
-		user.CreatedAt,
-		user.UpdatedAt,
-	)
+	// Insert user
+	result, err := r.collection.InsertOne(ctx, user)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		user.ObjectID = oid
 	}
 
-	user.ID = id
 	return user, nil
 }
 
 func (r *UserRepository) FindByID(id int64) (*model.User, error) {
-	query := `
-		SELECT * FROM users WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var user model.User
-	err := r.db.QueryRow(query, id).Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.PasswordHash,
-		&user.Phone,
-		&user.Balance,
-		&user.ReferralCode,
-		&user.ReferredBy,
-		&user.PlanID,
-		&user.IsKYCVerified,
-		&user.EmailVerified,
-		&user.IsAdmin,
-		&user.IsBlocked,
-		&user.BiometricEnabled,
-		&user.ProfilePicURL,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&user)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -101,32 +75,13 @@ func (r *UserRepository) FindByID(id int64) (*model.User, error) {
 }
 
 func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
-	query := `
-		SELECT * FROM users WHERE email = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var user model.User
-	err := r.db.QueryRow(query, email).Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.PasswordHash,
-		&user.Phone,
-		&user.Balance,
-		&user.ReferralCode,
-		&user.ReferredBy,
-		&user.PlanID,
-		&user.IsKYCVerified,
-		&user.EmailVerified,
-		&user.IsAdmin,
-		&user.IsBlocked,
-		&user.BiometricEnabled,
-		&user.ProfilePicURL,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"email": email}).Decode(&user)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -136,32 +91,13 @@ func (r *UserRepository) FindByEmail(email string) (*model.User, error) {
 }
 
 func (r *UserRepository) FindByReferralCode(code string) (*model.User, error) {
-	query := `
-		SELECT * FROM users WHERE referral_code = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var user model.User
-	err := r.db.QueryRow(query, code).Scan(
-		&user.ID,
-		&user.Name,
-		&user.Email,
-		&user.PasswordHash,
-		&user.Phone,
-		&user.Balance,
-		&user.ReferralCode,
-		&user.ReferredBy,
-		&user.PlanID,
-		&user.IsKYCVerified,
-		&user.EmailVerified,
-		&user.IsAdmin,
-		&user.IsBlocked,
-		&user.BiometricEnabled,
-		&user.ProfilePicURL,
-		&user.CreatedAt,
-		&user.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"referral_code": code}).Decode(&user)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -171,110 +107,48 @@ func (r *UserRepository) FindByReferralCode(code string) (*model.User, error) {
 }
 
 func (r *UserRepository) Update(user *model.User) error {
-	query := `
-		UPDATE users SET
-			name = ?,
-			email = ?,
-			password_hash = ?,
-			phone = ?,
-			balance = ?,
-			referral_code = ?,
-			referred_by = ?,
-			plan_id = ?,
-			is_kyc_verified = ?,
-			email_verified = ?,
-			is_admin = ?,
-			is_blocked = ?,
-			biometric_enabled = ?,
-			profile_pic_url = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	user.UpdatedAt = time.Now()
 
-	_, err := r.db.Exec(
-		query,
-		user.Name,
-		user.Email,
-		user.PasswordHash,
-		user.Phone,
-		user.Balance,
-		user.ReferralCode,
-		user.ReferredBy,
-		user.PlanID,
-		user.IsKYCVerified,
-		user.EmailVerified,
-		user.IsAdmin,
-		user.IsBlocked,
-		user.BiometricEnabled,
-		user.ProfilePicURL,
-		user.UpdatedAt,
-		user.ID,
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": user.ID},
+		bson.M{"$set": user},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *UserRepository) UpdateBalance(id int64, amount float64) error {
-	query := `
-		UPDATE users SET
-			balance = balance + ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, amount, time.Now(), id)
-	if err != nil {
-		return err
-	}
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": id},
+		bson.M{
+			"$inc": bson.M{"balance": amount},
+			"$set": bson.M{"updated_at": time.Now()},
+		},
+	)
 
-	return nil
+	return err
 }
 
 func (r *UserRepository) FindReferrals(userID int64) ([]*model.User, error) {
-	query := `
-		SELECT * FROM users WHERE referred_by = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, userID)
+	cursor, err := r.collection.Find(ctx, bson.M{"referred_by": userID})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var users []*model.User
-	for rows.Next() {
-		var user model.User
-		err := rows.Scan(
-			&user.ID,
-			&user.Name,
-			&user.Email,
-			&user.PasswordHash,
-			&user.Phone,
-			&user.Balance,
-			&user.ReferralCode,
-			&user.ReferredBy,
-			&user.PlanID,
-			&user.IsKYCVerified,
-			&user.EmailVerified,
-			&user.IsAdmin,
-			&user.IsBlocked,
-			&user.BiometricEnabled,
-			&user.ProfilePicURL,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		users = append(users, &user)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &users); err != nil {
 		return nil, err
 	}
 
@@ -282,58 +156,39 @@ func (r *UserRepository) FindReferrals(userID int64) ([]*model.User, error) {
 }
 
 func (r *UserRepository) FindAll(limit, offset int) ([]*model.User, error) {
-	query := `
-		SELECT * FROM users 
-		ORDER BY created_at DESC
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var users []*model.User
-	for rows.Next() {
-		var user model.User
-		err := rows.Scan(
-			&user.ID,
-			&user.Name,
-			&user.Email,
-			&user.PasswordHash,
-			&user.Phone,
-			&user.Balance,
-			&user.ReferralCode,
-			&user.ReferredBy,
-			&user.PlanID,
-			&user.IsKYCVerified,
-			&user.EmailVerified,
-			&user.IsAdmin,
-			&user.IsBlocked,
-			&user.BiometricEnabled,
-			&user.ProfilePicURL,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		users = append(users, &user)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &users); err != nil {
 		return nil, err
 	}
 
 	return users, nil
 }
 
-func (r *UserRepository) CountAll() (int, error) {
-	var count int
-	err := r.db.QueryRow("SELECT COUNT(*) FROM users").Scan(&count)
+func (r *UserRepository) CountAll() (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{})
 	if err != nil {
 		return 0, err
 	}
+
 	return count, nil
 }

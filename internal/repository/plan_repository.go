@@ -1,78 +1,67 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type PlanRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-
-func NewPlanRepository(db *sql.DB) *PlanRepository {
+func NewPlanRepository(conn *database.MongoDBConnection) *PlanRepository {
 	return &PlanRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("plans"),
 	}
 }
 
 func (r *PlanRepository) Create(plan *model.Plan) (*model.Plan, error) {
-	query := `
-		INSERT INTO plans (
-			name, daily_deposit_limit, daily_withdrawal_limit, daily_profit_limit,
-			price, is_default, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "plan_id")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set plan ID and timestamps
+	plan.ID = id
 	now := time.Now()
 	plan.CreatedAt = now
 	plan.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		plan.Name,
-		plan.DailyDepositLimit,
-		plan.DailyWithdrawalLimit,
-		plan.DailyProfitLimit,
-		plan.Price,
-		plan.IsDefault,
-		plan.CreatedAt,
-		plan.UpdatedAt,
-	)
+	// Insert plan
+	result, err := r.collection.InsertOne(ctx, plan)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		plan.ObjectID = oid
 	}
 
-	plan.ID = id
 	return plan, nil
 }
 
 func (r *PlanRepository) FindByID(id int64) (*model.Plan, error) {
-	query := `
-		SELECT * FROM plans WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var plan model.Plan
-	err := r.db.QueryRow(query, id).Scan(
-		&plan.ID,
-		&plan.Name,
-		&plan.DailyDepositLimit,
-		&plan.DailyWithdrawalLimit,
-		&plan.DailyProfitLimit,
-		&plan.Price,
-		&plan.IsDefault,
-		&plan.CreatedAt,
-		&plan.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&plan)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -82,37 +71,19 @@ func (r *PlanRepository) FindByID(id int64) (*model.Plan, error) {
 }
 
 func (r *PlanRepository) FindAll() ([]*model.Plan, error) {
-	query := `
-		SELECT * FROM plans ORDER BY price ASC
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query)
+	options := options.Find().SetSort(bson.D{{Key: "price", Value: 1}})
+
+	cursor, err := r.collection.Find(ctx, bson.M{}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var plans []*model.Plan
-	for rows.Next() {
-		var plan model.Plan
-		err := rows.Scan(
-			&plan.ID,
-			&plan.Name,
-			&plan.DailyDepositLimit,
-			&plan.DailyWithdrawalLimit,
-			&plan.DailyProfitLimit,
-			&plan.Price,
-			&plan.IsDefault,
-			&plan.CreatedAt,
-			&plan.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		plans = append(plans, &plan)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &plans); err != nil {
 		return nil, err
 	}
 
@@ -120,24 +91,13 @@ func (r *PlanRepository) FindAll() ([]*model.Plan, error) {
 }
 
 func (r *PlanRepository) FindDefault() (*model.Plan, error) {
-	query := `
-		SELECT * FROM plans WHERE is_default = TRUE LIMIT 1
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var plan model.Plan
-	err := r.db.QueryRow(query).Scan(
-		&plan.ID,
-		&plan.Name,
-		&plan.DailyDepositLimit,
-		&plan.DailyWithdrawalLimit,
-		&plan.DailyProfitLimit,
-		&plan.Price,
-		&plan.IsDefault,
-		&plan.CreatedAt,
-		&plan.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"is_default": true}).Decode(&plan)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -147,73 +107,75 @@ func (r *PlanRepository) FindDefault() (*model.Plan, error) {
 }
 
 func (r *PlanRepository) Update(plan *model.Plan) error {
-	query := `
-		UPDATE plans SET
-			name = ?,
-			daily_deposit_limit = ?,
-			daily_withdrawal_limit = ?,
-			daily_profit_limit = ?,
-			price = ?,
-			is_default = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	plan.UpdatedAt = time.Now()
 
-	_, err := r.db.Exec(
-		query,
-		plan.Name,
-		plan.DailyDepositLimit,
-		plan.DailyWithdrawalLimit,
-		plan.DailyProfitLimit,
-		plan.Price,
-		plan.IsDefault,
-		plan.UpdatedAt,
-		plan.ID,
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": plan.ID},
+		bson.M{"$set": plan},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *PlanRepository) Delete(id int64) error {
-	query := `DELETE FROM plans WHERE id = ?`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, id)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.collection.DeleteOne(ctx, bson.M{"id": id})
+	return err
 }
 
 func (r *PlanRepository) SetDefault(id int64) error {
-	// Begin transaction
-	tx, err := r.db.Begin()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Start a session for transaction
+	session, err := r.db.Client().StartSession()
 	if err != nil {
 		return err
 	}
+	defer session.EndSession(ctx)
 
-	// Set all plans as non-default
-	_, err = tx.Exec("UPDATE plans SET is_default = FALSE, updated_at = ?", time.Now())
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
-
-	// If id is 0, we're just removing all defaults
-	if id > 0 {
-		// Set the specified plan as default
-		_, err = tx.Exec("UPDATE plans SET is_default = TRUE, updated_at = ? WHERE id = ?", time.Now(), id)
+	// Use WithTransaction to run the operations in a transaction
+	_, err = session.WithTransaction(ctx, func(sessionCtx mongo.SessionContext) (interface{}, error) {
+		// Set all plans as non-default
+		_, err := r.collection.UpdateMany(
+			sessionCtx,
+			bson.M{},
+			bson.M{
+				"$set": bson.M{
+					"is_default": false,
+					"updated_at": time.Now(),
+				},
+			},
+		)
 		if err != nil {
-			tx.Rollback()
-			return err
+			return nil, err
 		}
-	}
 
-	// Commit transaction
-	return tx.Commit()
+		// If id is greater than 0, set the specified plan as default
+		if id > 0 {
+			_, err = r.collection.UpdateOne(
+				sessionCtx,
+				bson.M{"id": id},
+				bson.M{
+					"$set": bson.M{
+						"is_default": true,
+						"updated_at": time.Now(),
+					},
+				},
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return nil, nil
+	})
+
+	return err
 }

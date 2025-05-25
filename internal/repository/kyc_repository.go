@@ -1,79 +1,67 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type KYCRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-func NewKYCRepository(db *sql.DB) *KYCRepository {
+func NewKYCRepository(conn *database.MongoDBConnection) *KYCRepository {
 	return &KYCRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("kyc_documents"),
 	}
 }
 
 func (r *KYCRepository) Create(kyc *model.KYCDocument) (*model.KYCDocument, error) {
-	query := `
-		INSERT INTO kyc_documents (
-			user_id, document_type, document_front_url, document_back_url,
-			selfie_url, status, admin_note, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "kyc_document_id")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set KYC ID and timestamps
+	kyc.ID = id
 	now := time.Now()
 	kyc.CreatedAt = now
 	kyc.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		kyc.UserID,
-		kyc.DocumentType,
-		kyc.DocumentFrontURL,
-		kyc.DocumentBackURL,
-		kyc.SelfieURL,
-		kyc.Status,
-		kyc.AdminNote,
-		kyc.CreatedAt,
-		kyc.UpdatedAt,
-	)
+	// Insert KYC document
+	result, err := r.collection.InsertOne(ctx, kyc)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		kyc.ObjectID = oid
 	}
 
-	kyc.ID = id
 	return kyc, nil
 }
 
 func (r *KYCRepository) FindByID(id int64) (*model.KYCDocument, error) {
-	query := `
-		SELECT * FROM kyc_documents WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var kyc model.KYCDocument
-	err := r.db.QueryRow(query, id).Scan(
-		&kyc.ID,
-		&kyc.UserID,
-		&kyc.DocumentType,
-		&kyc.DocumentFrontURL,
-		&kyc.DocumentBackURL,
-		&kyc.SelfieURL,
-		&kyc.Status,
-		&kyc.AdminNote,
-		&kyc.CreatedAt,
-		&kyc.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&kyc)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -83,25 +71,16 @@ func (r *KYCRepository) FindByID(id int64) (*model.KYCDocument, error) {
 }
 
 func (r *KYCRepository) FindByUserID(userID int64) (*model.KYCDocument, error) {
-	query := `
-		SELECT * FROM kyc_documents WHERE user_id = ? ORDER BY created_at DESC LIMIT 1
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Find the most recent KYC document for the user
+	opts := options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})
 
 	var kyc model.KYCDocument
-	err := r.db.QueryRow(query, userID).Scan(
-		&kyc.ID,
-		&kyc.UserID,
-		&kyc.DocumentType,
-		&kyc.DocumentFrontURL,
-		&kyc.DocumentBackURL,
-		&kyc.SelfieURL,
-		&kyc.Status,
-		&kyc.AdminNote,
-		&kyc.CreatedAt,
-		&kyc.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"user_id": userID}, opts).Decode(&kyc)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -111,41 +90,25 @@ func (r *KYCRepository) FindByUserID(userID int64) (*model.KYCDocument, error) {
 }
 
 func (r *KYCRepository) FindByStatus(status model.KYCStatus, limit, offset int) ([]*model.KYCDocument, error) {
-	query := `
-		SELECT * FROM kyc_documents 
-		WHERE status = ? 
-		ORDER BY created_at DESC 
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, status, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{"status": status}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var documents []*model.KYCDocument
-	for rows.Next() {
-		var doc model.KYCDocument
-		err := rows.Scan(
-			&doc.ID,
-			&doc.UserID,
-			&doc.DocumentType,
-			&doc.DocumentFrontURL,
-			&doc.DocumentBackURL,
-			&doc.SelfieURL,
-			&doc.Status,
-			&doc.AdminNote,
-			&doc.CreatedAt,
-			&doc.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		documents = append(documents, &doc)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &documents); err != nil {
 		return nil, err
 	}
 
@@ -153,40 +116,25 @@ func (r *KYCRepository) FindByStatus(status model.KYCStatus, limit, offset int) 
 }
 
 func (r *KYCRepository) FindAll(limit, offset int) ([]*model.KYCDocument, error) {
-	query := `
-		SELECT * FROM kyc_documents 
-		ORDER BY created_at DESC 
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var documents []*model.KYCDocument
-	for rows.Next() {
-		var doc model.KYCDocument
-		err := rows.Scan(
-			&doc.ID,
-			&doc.UserID,
-			&doc.DocumentType,
-			&doc.DocumentFrontURL,
-			&doc.DocumentBackURL,
-			&doc.SelfieURL,
-			&doc.Status,
-			&doc.AdminNote,
-			&doc.CreatedAt,
-			&doc.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		documents = append(documents, &doc)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &documents); err != nil {
 		return nil, err
 	}
 
@@ -194,62 +142,50 @@ func (r *KYCRepository) FindAll(limit, offset int) ([]*model.KYCDocument, error)
 }
 
 func (r *KYCRepository) Update(kyc *model.KYCDocument) error {
-	query := `
-		UPDATE kyc_documents SET
-			user_id = ?,
-			document_type = ?,
-			document_front_url = ?,
-			document_back_url = ?,
-			selfie_url = ?,
-			status = ?,
-			admin_note = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	kyc.UpdatedAt = time.Now()
 
-	_, err := r.db.Exec(
-		query,
-		kyc.UserID,
-		kyc.DocumentType,
-		kyc.DocumentFrontURL,
-		kyc.DocumentBackURL,
-		kyc.SelfieURL,
-		kyc.Status,
-		kyc.AdminNote,
-		kyc.UpdatedAt,
-		kyc.ID,
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": kyc.ID},
+		bson.M{"$set": kyc},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *KYCRepository) UpdateStatus(id int64, status model.KYCStatus, adminNote string) error {
-	query := `
-		UPDATE kyc_documents SET
-			status = ?,
-			admin_note = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, status, adminNote, time.Now(), id)
-	if err != nil {
-		return err
+	update := bson.M{
+		"status":     status,
+		"updated_at": time.Now(),
 	}
 
-	return nil
+	if adminNote != "" {
+		update["admin_note"] = adminNote
+	}
+
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": id},
+		bson.M{"$set": update},
+	)
+
+	return err
 }
 
-func (r *KYCRepository) CountByStatus(status model.KYCStatus) (int, error) {
-	var count int
-	err := r.db.QueryRow("SELECT COUNT(*) FROM kyc_documents WHERE status = ?", status).Scan(&count)
+func (r *KYCRepository) CountByStatus(status model.KYCStatus) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{"status": status})
 	if err != nil {
 		return 0, err
 	}
+
 	return count, nil
 }

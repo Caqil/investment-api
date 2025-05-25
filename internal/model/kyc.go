@@ -2,6 +2,8 @@ package model
 
 import (
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type DocumentType string
@@ -18,16 +20,17 @@ const (
 )
 
 type KYCDocument struct {
-	ID               int64        `json:"id" db:"id"`
-	UserID           int64        `json:"user_id" db:"user_id"`
-	DocumentType     DocumentType `json:"document_type" db:"document_type"`
-	DocumentFrontURL string       `json:"document_front_url" db:"document_front_url"`
-	DocumentBackURL  string       `json:"document_back_url,omitempty" db:"document_back_url"`
-	SelfieURL        string       `json:"selfie_url" db:"selfie_url"`
-	Status           KYCStatus    `json:"status" db:"status"`
-	AdminNote        string       `json:"admin_note,omitempty" db:"admin_note"`
-	CreatedAt        time.Time    `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time    `json:"updated_at" db:"updated_at"`
+	ID               int64              `json:"id" bson:"id"`
+	ObjectID         primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	UserID           int64              `json:"user_id" bson:"user_id"`
+	DocumentType     DocumentType       `json:"document_type" bson:"document_type"`
+	DocumentFrontURL string             `json:"document_front_url" bson:"document_front_url"`
+	DocumentBackURL  string             `json:"document_back_url,omitempty" bson:"document_back_url,omitempty"`
+	SelfieURL        string             `json:"selfie_url" bson:"selfie_url"`
+	Status           KYCStatus          `json:"status" bson:"status"`
+	AdminNote        string             `json:"admin_note,omitempty" bson:"admin_note,omitempty"`
+	CreatedAt        time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 type KYCDocumentResponse struct {

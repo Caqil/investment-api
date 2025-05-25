@@ -2,15 +2,18 @@ package model
 
 import (
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type FAQ struct {
-	ID          int64     `json:"id" db:"id"`
-	Question    string    `json:"question" db:"question"`
-	Answer      string    `json:"answer" db:"answer"`
-	OrderNumber int       `json:"order_number" db:"order_number"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	ID          int64              `json:"id" bson:"id"`
+	ObjectID    primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	Question    string             `json:"question" bson:"question"`
+	Answer      string             `json:"answer" bson:"answer"`
+	OrderNumber int                `json:"order_number" bson:"order_number"`
+	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 type FAQResponse struct {

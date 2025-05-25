@@ -1,7 +1,6 @@
 package admin
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 
@@ -9,58 +8,42 @@ import (
 	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/Caqil/investment-api/internal/model"
 	"github.com/Caqil/investment-api/internal/repository"
+	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/gin-gonic/gin"
 	"github.com/qor/admin"
 	"github.com/qor/assetfs"
 	"github.com/qor/qor"
 	"github.com/qor/qor/resource"
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
 
 // AdminSetup represents the admin interface setup
 type AdminSetup struct {
-	Admin    *admin.Admin
-	DB       *sql.DB
-	GormDB   *gorm.DB
-	Config   *config.Config
-	UserRepo *repository.UserRepository
+	Admin     *admin.Admin
+	MongoConn *database.MongoDBConnection
+	UserRepo  *repository.UserRepository
+	Config    *config.Config
 }
 
 // Make sure AdminSetup implements the AdminInterface
 var _ interfaces.AdminInterface = (*AdminSetup)(nil)
 
 // NewAdminSetup creates a new admin setup
-func NewAdminSetup(db *sql.DB, cfg *config.Config) *AdminSetup {
-	// Convert sql.DB to gorm.DB
-	// Get the database DSN from db connection
-	// This is an example DSN - you may need to construct it from your config
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-		cfg.Database.Username,
-		cfg.Database.Password,
-		cfg.Database.Host,
-		cfg.Database.Port,
-		cfg.Database.Name,
-	)
-
-	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-	if err != nil {
-		panic("Failed to connect to database with GORM: " + err.Error())
-	}
-
+func NewAdminSetup(mongoConn *database.MongoDBConnection, cfg *config.Config) *AdminSetup {
 	// Create a new admin instance
 	Admin := admin.New(&admin.AdminConfig{
-		DB:      gormDB,
+		DB:      nil, // We're not using GORM, so this can be nil
 		AssetFS: assetfs.AssetFS().NameSpace("admin"),
 	})
 
+	// Create user repository
+	userRepo := repository.NewUserRepository(mongoConn)
+
 	// Create admin setup
 	adminSetup := &AdminSetup{
-		Admin:    Admin,
-		DB:       db,
-		GormDB:   gormDB,
-		Config:   cfg,
-		UserRepo: repository.NewUserRepository(db),
+		Admin:     Admin,
+		MongoConn: mongoConn,
+		UserRepo:  userRepo,
+		Config:    cfg,
 	}
 
 	// Initialize admin
@@ -188,102 +171,7 @@ func (as *AdminSetup) registerResources() {
 	plan.EditAttrs("Name", "Price", "DailyDepositLimit", "DailyWithdrawalLimit", "DailyProfitLimit", "IsDefault")
 	plan.NewAttrs("Name", "Price", "DailyDepositLimit", "DailyWithdrawalLimit", "DailyProfitLimit", "IsDefault")
 
-	// Register Withdrawal resource
-	withdrawal := as.Admin.AddResource(&model.Withdrawal{}, &admin.Config{
-		Menu: []string{"Financial Management"},
-		Name: "Withdrawals",
-	})
-
-	withdrawal.Meta(&admin.Meta{Name: "ID", Type: "string"})
-	withdrawal.Meta(&admin.Meta{Name: "UserID", Type: "string"})
-	withdrawal.Meta(&admin.Meta{Name: "Amount", Type: "number"})
-	withdrawal.Meta(&admin.Meta{Name: "PaymentMethod", Type: "string"})
-	withdrawal.Meta(&admin.Meta{Name: "Status", Type: "select_one", Collection: []string{"pending", "approved", "rejected"}})
-	withdrawal.Meta(&admin.Meta{Name: "AdminNote", Type: "text"})
-	withdrawal.Meta(&admin.Meta{Name: "CreatedAt", Type: "datetime"})
-
-	withdrawal.IndexAttrs("ID", "UserID", "Amount", "PaymentMethod", "Status", "CreatedAt")
-	withdrawal.ShowAttrs("ID", "TransactionID", "UserID", "Amount", "PaymentMethod", "Status", "AdminNote", "TasksCompleted", "CreatedAt")
-	withdrawal.EditAttrs("Status", "AdminNote")
-
-	// Register Transaction resource
-	transaction := as.Admin.AddResource(&model.Transaction{}, &admin.Config{
-		Menu: []string{"Financial Management"},
-		Name: "Transactions",
-	})
-
-	transaction.Meta(&admin.Meta{Name: "ID", Type: "string"})
-	transaction.Meta(&admin.Meta{Name: "UserID", Type: "string"})
-	transaction.Meta(&admin.Meta{Name: "Amount", Type: "number"})
-	transaction.Meta(&admin.Meta{Name: "Type", Type: "select_one", Collection: []string{"deposit", "withdrawal", "bonus", "referral_bonus", "plan_purchase", "referral_profit"}})
-	transaction.Meta(&admin.Meta{Name: "Status", Type: "select_one", Collection: []string{"pending", "completed", "rejected"}})
-	transaction.Meta(&admin.Meta{Name: "Description", Type: "text"})
-	transaction.Meta(&admin.Meta{Name: "CreatedAt", Type: "datetime"})
-
-	transaction.IndexAttrs("ID", "UserID", "Amount", "Type", "Status", "CreatedAt")
-	transaction.ShowAttrs("ID", "UserID", "Amount", "Type", "Status", "Description", "CreatedAt")
-	transaction.EditAttrs("Status", "Description")
-
-	// Register KYC resource
-	kyc := as.Admin.AddResource(&model.KYCDocument{}, &admin.Config{
-		Menu: []string{"User Management"},
-		Name: "KYC Documents",
-	})
-
-	kyc.Meta(&admin.Meta{Name: "ID", Type: "string"})
-	kyc.Meta(&admin.Meta{Name: "UserID", Type: "string"})
-	kyc.Meta(&admin.Meta{Name: "DocumentType", Type: "select_one", Collection: []string{"id_card", "passport", "driving_license"}})
-	kyc.Meta(&admin.Meta{Name: "DocumentFrontURL", Type: "string"})
-	kyc.Meta(&admin.Meta{Name: "DocumentBackURL", Type: "string"})
-	kyc.Meta(&admin.Meta{Name: "SelfieURL", Type: "string"})
-	kyc.Meta(&admin.Meta{Name: "Status", Type: "select_one", Collection: []string{"pending", "approved", "rejected"}})
-	kyc.Meta(&admin.Meta{Name: "AdminNote", Type: "text"})
-	kyc.Meta(&admin.Meta{Name: "CreatedAt", Type: "datetime"})
-
-	kyc.IndexAttrs("ID", "UserID", "DocumentType", "Status", "CreatedAt")
-	kyc.ShowAttrs("ID", "UserID", "DocumentType", "DocumentFrontURL", "DocumentBackURL", "SelfieURL", "Status", "AdminNote", "CreatedAt")
-	kyc.EditAttrs("Status", "AdminNote")
-
-	// Register Task resource
-	task := as.Admin.AddResource(&model.Task{}, &admin.Config{
-		Menu: []string{"Task Management"},
-		Name: "Tasks",
-	})
-
-	task.Meta(&admin.Meta{Name: "ID", Type: "string"})
-	task.Meta(&admin.Meta{Name: "Name", Type: "string"})
-	task.Meta(&admin.Meta{Name: "Description", Type: "text"})
-	task.Meta(&admin.Meta{Name: "TaskType", Type: "select_one", Collection: []string{"follow", "like", "install"}})
-	task.Meta(&admin.Meta{Name: "TaskURL", Type: "string"})
-	task.Meta(&admin.Meta{
-		Name: "IsMandatory",
-		Type: "select_one",
-		Valuer: func(record interface{}, context *qor.Context) (result interface{}) {
-			if t, ok := record.(*model.Task); ok {
-				if t.IsMandatory {
-					return "Yes"
-				}
-			}
-			return "No"
-		},
-		Collection: []string{"Yes", "No"},
-		Setter: func(record interface{}, metaValue *resource.MetaValue, context *qor.Context) {
-			if t, ok := record.(*model.Task); ok {
-				if metaValue.Value.(string) == "Yes" {
-					t.IsMandatory = true
-				} else {
-					t.IsMandatory = false
-				}
-			}
-		},
-	})
-
-	task.IndexAttrs("ID", "Name", "TaskType", "IsMandatory", "CreatedAt")
-	task.ShowAttrs("ID", "Name", "Description", "TaskType", "TaskURL", "IsMandatory", "CreatedAt")
-	task.EditAttrs("Name", "Description", "TaskType", "TaskURL", "IsMandatory")
-	task.NewAttrs("Name", "Description", "TaskType", "TaskURL", "IsMandatory")
-
-	// Add more resources as needed
+	// Add more resource registrations as needed
 }
 
 // addCustomPages adds custom pages to the admin interface

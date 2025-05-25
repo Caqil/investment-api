@@ -1,77 +1,71 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type NotificationRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-func (r *NotificationRepository) GetDB() *sql.DB {
-	return r.db
-}
-func NewNotificationRepository(db *sql.DB) *NotificationRepository {
+func NewNotificationRepository(conn *database.MongoDBConnection) *NotificationRepository {
 	return &NotificationRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("notifications"),
 	}
 }
 
-func (r *NotificationRepository) Create(notification *model.Notification) (*model.Notification, error) {
-	query := `
-		INSERT INTO notifications (
-			user_id, title, message, type, is_read, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?)
-	`
+func (r *NotificationRepository) GetDB() *mongo.Database {
+	return r.db
+}
 
+func (r *NotificationRepository) Create(notification *model.Notification) (*model.Notification, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "notification_id")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set notification ID and timestamps
+	notification.ID = id
 	now := time.Now()
 	notification.CreatedAt = now
 	notification.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		notification.UserID,
-		notification.Title,
-		notification.Message,
-		notification.Type,
-		notification.IsRead,
-		notification.CreatedAt,
-		notification.UpdatedAt,
-	)
+	// Insert notification
+	result, err := r.collection.InsertOne(ctx, notification)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		notification.ObjectID = oid
 	}
 
-	notification.ID = id
 	return notification, nil
 }
 
 func (r *NotificationRepository) FindByID(id int64) (*model.Notification, error) {
-	query := `
-		SELECT * FROM notifications WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var notification model.Notification
-	err := r.db.QueryRow(query, id).Scan(
-		&notification.ID,
-		&notification.UserID,
-		&notification.Title,
-		&notification.Message,
-		&notification.Type,
-		&notification.IsRead,
-		&notification.CreatedAt,
-		&notification.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&notification)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -81,39 +75,25 @@ func (r *NotificationRepository) FindByID(id int64) (*model.Notification, error)
 }
 
 func (r *NotificationRepository) FindByUserID(userID int64, limit, offset int) ([]*model.Notification, error) {
-	query := `
-		SELECT * FROM notifications 
-		WHERE user_id = ? 
-		ORDER BY created_at DESC 
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, userID, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{"user_id": userID}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var notifications []*model.Notification
-	for rows.Next() {
-		var notification model.Notification
-		err := rows.Scan(
-			&notification.ID,
-			&notification.UserID,
-			&notification.Title,
-			&notification.Message,
-			&notification.Type,
-			&notification.IsRead,
-			&notification.CreatedAt,
-			&notification.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		notifications = append(notifications, &notification)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &notifications); err != nil {
 		return nil, err
 	}
 
@@ -121,192 +101,186 @@ func (r *NotificationRepository) FindByUserID(userID int64, limit, offset int) (
 }
 
 func (r *NotificationRepository) FindUnreadByUserID(userID int64, limit, offset int) ([]*model.Notification, error) {
-	query := `
-		SELECT * FROM notifications 
-		WHERE user_id = ? AND is_read = FALSE 
-		ORDER BY created_at DESC 
-		LIMIT ? OFFSET ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, userID, limit, offset)
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx,
+		bson.M{
+			"user_id": userID,
+			"is_read": false,
+		},
+		options,
+	)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var notifications []*model.Notification
-	for rows.Next() {
-		var notification model.Notification
-		err := rows.Scan(
-			&notification.ID,
-			&notification.UserID,
-			&notification.Title,
-			&notification.Message,
-			&notification.Type,
-			&notification.IsRead,
-			&notification.CreatedAt,
-			&notification.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		notifications = append(notifications, &notification)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &notifications); err != nil {
 		return nil, err
 	}
 
 	return notifications, nil
 }
 
-func (r *NotificationRepository) CountUnreadByUserID(userID int64) (int, error) {
-	var count int
-	err := r.db.QueryRow("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = FALSE", userID).Scan(&count)
+func (r *NotificationRepository) CountUnreadByUserID(userID int64) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{
+		"user_id": userID,
+		"is_read": false,
+	})
 	if err != nil {
 		return 0, err
 	}
+
 	return count, nil
 }
 
 func (r *NotificationRepository) Update(notification *model.Notification) error {
-	query := `
-		UPDATE notifications SET
-			user_id = ?,
-			title = ?,
-			message = ?,
-			type = ?,
-			is_read = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	notification.UpdatedAt = time.Now()
 
-	_, err := r.db.Exec(
-		query,
-		notification.UserID,
-		notification.Title,
-		notification.Message,
-		notification.Type,
-		notification.IsRead,
-		notification.UpdatedAt,
-		notification.ID,
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": notification.ID},
+		bson.M{"$set": notification},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *NotificationRepository) MarkAsRead(id int64) error {
-	query := `
-		UPDATE notifications SET
-			is_read = TRUE,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, time.Now(), id)
-	if err != nil {
-		return err
-	}
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": id},
+		bson.M{
+			"$set": bson.M{
+				"is_read":    true,
+				"updated_at": time.Now(),
+			},
+		},
+	)
 
-	return nil
+	return err
 }
 
 func (r *NotificationRepository) MarkAllAsRead(userID int64) error {
-	query := `
-		UPDATE notifications SET
-			is_read = TRUE,
-			updated_at = ?
-		WHERE user_id = ? AND is_read = FALSE
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, time.Now(), userID)
-	if err != nil {
-		return err
-	}
+	_, err := r.collection.UpdateMany(
+		ctx,
+		bson.M{
+			"user_id": userID,
+			"is_read": false,
+		},
+		bson.M{
+			"$set": bson.M{
+				"is_read":    true,
+				"updated_at": time.Now(),
+			},
+		},
+	)
 
-	return nil
+	return err
 }
 
 func (r *NotificationRepository) Delete(id int64) error {
-	query := `DELETE FROM notifications WHERE id = ?`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, id)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.collection.DeleteOne(ctx, bson.M{"id": id})
+	return err
 }
 
 func (r *NotificationRepository) DeleteAllByUserID(userID int64) error {
-	query := `DELETE FROM notifications WHERE user_id = ?`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, userID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.collection.DeleteMany(ctx, bson.M{"user_id": userID})
+	return err
 }
 
 // Create a notification for all users
 func (r *NotificationRepository) CreateForAllUsers(title, message string, notificationType model.NotificationType) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	// Get all user IDs
-	userIDsQuery := `SELECT id FROM users WHERE is_blocked = FALSE`
-	rows, err := r.db.Query(userIDsQuery)
+	userCollection := r.db.Collection("users")
+	cursor, err := userCollection.Find(ctx, bson.M{"is_blocked": false}, options.Find().SetProjection(bson.M{"id": 1}))
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
-	var userIDs []int64
-	for rows.Next() {
-		var userID int64
-		if err := rows.Scan(&userID); err != nil {
-			return err
-		}
-		userIDs = append(userIDs, userID)
+	var users []struct {
+		ID int64 `bson:"id"`
 	}
 
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &users); err != nil {
 		return err
 	}
 
-	// Begin transaction
-	tx, err := r.db.Begin()
+	// Start a session for transaction
+	session, err := r.db.Client().StartSession()
 	if err != nil {
 		return err
 	}
+	defer session.EndSession(ctx)
 
-	// Insert notification for each user
-	insertQuery := `
-		INSERT INTO notifications (
-			user_id, title, message, type, is_read, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?)
-	`
+	// Use WithTransaction to run the operations in a transaction
+	_, err = session.WithTransaction(ctx, func(sessionCtx mongo.SessionContext) (interface{}, error) {
+		now := time.Now()
+		notifications := make([]interface{}, 0, len(users))
 
-	now := time.Now()
-	for _, userID := range userIDs {
-		_, err := tx.Exec(
-			insertQuery,
-			userID,
-			title,
-			message,
-			notificationType,
-			false,
-			now,
-			now,
-		)
-		if err != nil {
-			tx.Rollback()
-			return err
+		// Create notification documents for each user
+		for i, user := range users {
+			// Get next ID for each notification
+			id, err := database.GetNextSequence(r.db, "notification_id")
+			if err != nil {
+				return nil, err
+			}
+
+			notifications = append(notifications, bson.M{
+				"id":         id,
+				"user_id":    user.ID,
+				"title":      title,
+				"message":    message,
+				"type":       notificationType,
+				"is_read":    false,
+				"created_at": now,
+				"updated_at": now,
+			})
+
+			// Insert in batches of 1000 to avoid exceeding document size limit
+			if i > 0 && i%1000 == 0 || i == len(users)-1 {
+				_, err = r.collection.InsertMany(sessionCtx, notifications)
+				if err != nil {
+					return nil, err
+				}
+				notifications = notifications[:0] // Clear the slice
+			}
 		}
-	}
 
-	return tx.Commit()
+		return nil, nil
+	})
+
+	return err
 }

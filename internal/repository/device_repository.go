@@ -1,163 +1,102 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type DeviceRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-func NewDeviceRepository(db *sql.DB) *DeviceRepository {
+func NewDeviceRepository(conn *database.MongoDBConnection) *DeviceRepository {
 	return &DeviceRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("devices"),
 	}
 }
 
 func (r *DeviceRepository) Create(device *model.Device) (*model.Device, error) {
-	query := `
-		INSERT INTO devices (
-			user_id, device_id, device_name, device_model,
-			last_login, is_active, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "device_id")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set device ID and timestamps
+	device.ID = id
 	now := time.Now()
 	device.CreatedAt = now
 	device.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		device.UserID,
-		device.DeviceID,
-		device.DeviceName,
-		device.DeviceModel,
-		device.LastLogin,
-		device.IsActive,
-		device.CreatedAt,
-		device.UpdatedAt,
-	)
+	// Insert device
+	result, err := r.collection.InsertOne(ctx, device)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		device.ObjectID = oid
 	}
 
-	device.ID = id
 	return device, nil
 }
 
 func (r *DeviceRepository) FindByID(id int64) (*model.Device, error) {
-	query := `
-		SELECT * FROM devices WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var device model.Device
-	var lastLogin sql.NullTime
-
-	err := r.db.QueryRow(query, id).Scan(
-		&device.ID,
-		&device.UserID,
-		&device.DeviceID,
-		&device.DeviceName,
-		&device.DeviceModel,
-		&lastLogin,
-		&device.IsActive,
-		&device.CreatedAt,
-		&device.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&device)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	if lastLogin.Valid {
-		device.LastLogin = &lastLogin.Time
 	}
 
 	return &device, nil
 }
 
 func (r *DeviceRepository) FindByDeviceID(deviceID string) (*model.Device, error) {
-	query := `
-		SELECT * FROM devices WHERE device_id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var device model.Device
-	var lastLogin sql.NullTime
-
-	err := r.db.QueryRow(query, deviceID).Scan(
-		&device.ID,
-		&device.UserID,
-		&device.DeviceID,
-		&device.DeviceName,
-		&device.DeviceModel,
-		&lastLogin,
-		&device.IsActive,
-		&device.CreatedAt,
-		&device.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"device_id": deviceID}).Decode(&device)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	if lastLogin.Valid {
-		device.LastLogin = &lastLogin.Time
 	}
 
 	return &device, nil
 }
 
 func (r *DeviceRepository) FindByUserID(userID int64) ([]*model.Device, error) {
-	query := `
-		SELECT * FROM devices WHERE user_id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, userID)
+	cursor, err := r.collection.Find(ctx, bson.M{"user_id": userID})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var devices []*model.Device
-	for rows.Next() {
-		var device model.Device
-		var lastLogin sql.NullTime
-
-		err := rows.Scan(
-			&device.ID,
-			&device.UserID,
-			&device.DeviceID,
-			&device.DeviceName,
-			&device.DeviceModel,
-			&lastLogin,
-			&device.IsActive,
-			&device.CreatedAt,
-			&device.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if lastLogin.Valid {
-			device.LastLogin = &lastLogin.Time
-		}
-
-		devices = append(devices, &device)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &devices); err != nil {
 		return nil, err
 	}
 
@@ -165,44 +104,45 @@ func (r *DeviceRepository) FindByUserID(userID int64) ([]*model.Device, error) {
 }
 
 func (r *DeviceRepository) UpdateLastLogin(deviceID string, lastLogin time.Time) error {
-	query := `
-		UPDATE devices SET
-			last_login = ?,
-			updated_at = ?
-		WHERE device_id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, lastLogin, time.Now(), deviceID)
-	if err != nil {
-		return err
-	}
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"device_id": deviceID},
+		bson.M{
+			"$set": bson.M{
+				"last_login": lastLogin,
+				"updated_at": time.Now(),
+			},
+		},
+	)
 
-	return nil
+	return err
 }
 
 func (r *DeviceRepository) UpdateActive(deviceID string, isActive bool) error {
-	query := `
-		UPDATE devices SET
-			is_active = ?,
-			updated_at = ?
-		WHERE device_id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, isActive, time.Now(), deviceID)
-	if err != nil {
-		return err
-	}
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"device_id": deviceID},
+		bson.M{
+			"$set": bson.M{
+				"is_active":  isActive,
+				"updated_at": time.Now(),
+			},
+		},
+	)
 
-	return nil
+	return err
 }
 
 func (r *DeviceRepository) Delete(id int64) error {
-	query := `DELETE FROM devices WHERE id = ?`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, id)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.collection.DeleteOne(ctx, bson.M{"id": id})
+	return err
 }

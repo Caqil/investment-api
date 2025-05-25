@@ -1,25 +1,24 @@
 package admin
 
 import (
-	"database/sql"
-
 	"github.com/Caqil/investment-api/config"
 	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/Caqil/investment-api/internal/repository"
+	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/Caqil/investment-api/pkg/utils"
 )
 
 // Factory creates admin components
 type Factory struct {
-	DB         *sql.DB
+	MongoConn  *database.MongoDBConnection
 	Config     *config.Config
 	JWTManager *utils.JWTManager
 }
 
 // NewFactory creates a new admin factory
-func NewFactory(db *sql.DB, cfg *config.Config, jwtManager *utils.JWTManager) *Factory {
+func NewFactory(mongoConn *database.MongoDBConnection, cfg *config.Config, jwtManager *utils.JWTManager) *Factory {
 	return &Factory{
-		DB:         db,
+		MongoConn:  mongoConn,
 		Config:     cfg,
 		JWTManager: jwtManager,
 	}
@@ -27,23 +26,23 @@ func NewFactory(db *sql.DB, cfg *config.Config, jwtManager *utils.JWTManager) *F
 
 // CreateAdminSetup creates an admin setup
 func (f *Factory) CreateAdminSetup() interfaces.AdminInterface {
-	adminSetup := NewAdminSetup(f.DB, f.Config)
+	adminSetup := NewAdminSetup(f.MongoConn, f.Config)
 	adminSetup.SetupAuth()
 	return adminSetup
 }
 
 // CreateAdminAuthController creates an admin auth controller
 func (f *Factory) CreateAdminAuthController() interfaces.AdminAuthInterface {
-	userRepo := repository.NewUserRepository(f.DB)
+	userRepo := repository.NewUserRepository(f.MongoConn)
 	return NewAdminAuthController(userRepo, f.JWTManager)
 }
 
 // CreateDashboardController creates a dashboard controller
 func (f *Factory) CreateDashboardController() interfaces.DashboardInterface {
-	userRepo := repository.NewUserRepository(f.DB)
-	transactionRepo := repository.NewTransactionRepository(f.DB)
-	withdrawalRepo := repository.NewWithdrawalRepository(f.DB)
-	kycRepo := repository.NewKYCRepository(f.DB)
+	userRepo := repository.NewUserRepository(f.MongoConn)
+	transactionRepo := repository.NewTransactionRepository(f.MongoConn)
+	withdrawalRepo := repository.NewWithdrawalRepository(f.MongoConn)
+	kycRepo := repository.NewKYCRepository(f.MongoConn)
 
 	return NewDashboardController(
 		userRepo,

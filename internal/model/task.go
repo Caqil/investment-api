@@ -2,6 +2,8 @@ package model
 
 import (
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type TaskType string
@@ -13,27 +15,29 @@ const (
 )
 
 type Task struct {
-	ID          int64     `json:"id" db:"id"`
-	Name        string    `json:"name" db:"name"`
-	Description string    `json:"description" db:"description"`
-	TaskType    TaskType  `json:"task_type" db:"task_type"`
-	TaskURL     string    `json:"task_url,omitempty" db:"task_url"`
-	IsMandatory bool      `json:"is_mandatory" db:"is_mandatory"`
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at" db:"updated_at"`
+	ID          int64              `json:"id" bson:"id"`
+	ObjectID    primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	Name        string             `json:"name" bson:"name"`
+	Description string             `json:"description" bson:"description"`
+	TaskType    TaskType           `json:"task_type" bson:"task_type"`
+	TaskURL     string             `json:"task_url,omitempty" bson:"task_url,omitempty"`
+	IsMandatory bool               `json:"is_mandatory" bson:"is_mandatory"`
+	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 type UserTask struct {
-	ID          int64      `json:"id" db:"id"`
-	UserID      int64      `json:"user_id" db:"user_id"`
-	TaskID      int64      `json:"task_id" db:"task_id"`
-	IsCompleted bool       `json:"is_completed" db:"is_completed"`
-	CompletedAt *time.Time `json:"completed_at,omitempty" db:"completed_at"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	ID          int64              `json:"id" bson:"id"`
+	ObjectID    primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	UserID      int64              `json:"user_id" bson:"user_id"`
+	TaskID      int64              `json:"task_id" bson:"task_id"`
+	IsCompleted bool               `json:"is_completed" bson:"is_completed"`
+	CompletedAt *time.Time         `json:"completed_at,omitempty" bson:"completed_at,omitempty"`
+	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
 
 	// Populated fields (not from database)
-	Task *Task `json:"task,omitempty" db:"-"`
+	Task *Task `json:"task,omitempty" bson:"-"`
 }
 
 type TaskResponse struct {

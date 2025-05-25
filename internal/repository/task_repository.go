@@ -1,79 +1,72 @@
 package repository
 
 import (
-	"database/sql"
+	"context"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/pkg/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type TaskRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-func NewTaskRepository(db *sql.DB) *TaskRepository {
+func NewTaskRepository(conn *database.MongoDBConnection) *TaskRepository {
 	return &TaskRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("tasks"),
 	}
 }
 
 // GetDB returns the database connection
-func (r *TaskRepository) GetDB() *sql.DB {
+func (r *TaskRepository) GetDB() *mongo.Database {
 	return r.db
 }
 
 func (r *TaskRepository) Create(task *model.Task) (*model.Task, error) {
-	query := `
-		INSERT INTO tasks (
-			name, description, task_type, task_url, is_mandatory, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?)
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "task_id")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set task ID and timestamps
+	task.ID = id
 	now := time.Now()
 	task.CreatedAt = now
 	task.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		task.Name,
-		task.Description,
-		task.TaskType,
-		task.TaskURL,
-		task.IsMandatory,
-		task.CreatedAt,
-		task.UpdatedAt,
-	)
+	// Insert task
+	result, err := r.collection.InsertOne(ctx, task)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		task.ObjectID = oid
 	}
 
-	task.ID = id
 	return task, nil
 }
 
 func (r *TaskRepository) FindByID(id int64) (*model.Task, error) {
-	query := `
-		SELECT * FROM tasks WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var task model.Task
-	err := r.db.QueryRow(query, id).Scan(
-		&task.ID,
-		&task.Name,
-		&task.Description,
-		&task.TaskType,
-		&task.TaskURL,
-		&task.IsMandatory,
-		&task.CreatedAt,
-		&task.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&task)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
@@ -83,36 +76,19 @@ func (r *TaskRepository) FindByID(id int64) (*model.Task, error) {
 }
 
 func (r *TaskRepository) FindAll() ([]*model.Task, error) {
-	query := `
-		SELECT * FROM tasks ORDER BY created_at
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query)
+	options := options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}})
+
+	cursor, err := r.collection.Find(ctx, bson.M{}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var tasks []*model.Task
-	for rows.Next() {
-		var task model.Task
-		err := rows.Scan(
-			&task.ID,
-			&task.Name,
-			&task.Description,
-			&task.TaskType,
-			&task.TaskURL,
-			&task.IsMandatory,
-			&task.CreatedAt,
-			&task.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		tasks = append(tasks, &task)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &tasks); err != nil {
 		return nil, err
 	}
 
@@ -120,36 +96,19 @@ func (r *TaskRepository) FindAll() ([]*model.Task, error) {
 }
 
 func (r *TaskRepository) FindByMandatory(isMandatory bool) ([]*model.Task, error) {
-	query := `
-		SELECT * FROM tasks WHERE is_mandatory = ? ORDER BY created_at
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, isMandatory)
+	options := options.Find().SetSort(bson.D{{Key: "created_at", Value: 1}})
+
+	cursor, err := r.collection.Find(ctx, bson.M{"is_mandatory": isMandatory}, options)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var tasks []*model.Task
-	for rows.Next() {
-		var task model.Task
-		err := rows.Scan(
-			&task.ID,
-			&task.Name,
-			&task.Description,
-			&task.TaskType,
-			&task.TaskURL,
-			&task.IsMandatory,
-			&task.CreatedAt,
-			&task.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-		tasks = append(tasks, &task)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &tasks); err != nil {
 		return nil, err
 	}
 
@@ -157,159 +116,99 @@ func (r *TaskRepository) FindByMandatory(isMandatory bool) ([]*model.Task, error
 }
 
 func (r *TaskRepository) Update(task *model.Task) error {
-	query := `
-		UPDATE tasks SET
-			name = ?,
-			description = ?,
-			task_type = ?,
-			task_url = ?,
-			is_mandatory = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	task.UpdatedAt = time.Now()
 
-	_, err := r.db.Exec(
-		query,
-		task.Name,
-		task.Description,
-		task.TaskType,
-		task.TaskURL,
-		task.IsMandatory,
-		task.UpdatedAt,
-		task.ID,
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": task.ID},
+		bson.M{"$set": task},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *TaskRepository) Delete(id int64) error {
-	query := `DELETE FROM tasks WHERE id = ?`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, id)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.collection.DeleteOne(ctx, bson.M{"id": id})
+	return err
 }
 
 // UserTaskRepository handles user task operations
 type UserTaskRepository struct {
-	db *sql.DB
+	db         *mongo.Database
+	collection *mongo.Collection
 }
 
-func NewUserTaskRepository(db *sql.DB) *UserTaskRepository {
+func NewUserTaskRepository(conn *database.MongoDBConnection) *UserTaskRepository {
 	return &UserTaskRepository{
-		db: db,
+		db:         conn.Database,
+		collection: conn.GetCollection("user_tasks"),
 	}
 }
 
 func (r *UserTaskRepository) Create(userTask *model.UserTask) (*model.UserTask, error) {
-	query := `
-		INSERT INTO user_tasks (
-			user_id, task_id, is_completed, completed_at, created_at, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?)
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	// Generate auto-incrementing ID
+	id, err := database.GetNextSequence(r.db, "user_task_id")
+	if err != nil {
+		return nil, err
+	}
+
+	// Set userTask ID and timestamps
+	userTask.ID = id
 	now := time.Now()
 	userTask.CreatedAt = now
 	userTask.UpdatedAt = now
 
-	result, err := r.db.Exec(
-		query,
-		userTask.UserID,
-		userTask.TaskID,
-		userTask.IsCompleted,
-		userTask.CompletedAt,
-		userTask.CreatedAt,
-		userTask.UpdatedAt,
-	)
+	// Insert userTask
+	result, err := r.collection.InsertOne(ctx, userTask)
 	if err != nil {
 		return nil, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return nil, err
+	// Set ObjectID from the result
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		userTask.ObjectID = oid
 	}
 
-	userTask.ID = id
 	return userTask, nil
 }
 
 func (r *UserTaskRepository) FindByID(id int64) (*model.UserTask, error) {
-	query := `
-		SELECT * FROM user_tasks WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var userTask model.UserTask
-	var completedAt sql.NullTime
-
-	err := r.db.QueryRow(query, id).Scan(
-		&userTask.ID,
-		&userTask.UserID,
-		&userTask.TaskID,
-		&userTask.IsCompleted,
-		&completedAt,
-		&userTask.CreatedAt,
-		&userTask.UpdatedAt,
-	)
+	err := r.collection.FindOne(ctx, bson.M{"id": id}).Decode(&userTask)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	if completedAt.Valid {
-		userTask.CompletedAt = &completedAt.Time
 	}
 
 	return &userTask, nil
 }
 
 func (r *UserTaskRepository) FindByUserID(userID int64) ([]*model.UserTask, error) {
-	query := `
-		SELECT * FROM user_tasks WHERE user_id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	rows, err := r.db.Query(query, userID)
+	cursor, err := r.collection.Find(ctx, bson.M{"user_id": userID})
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer cursor.Close(ctx)
 
 	var userTasks []*model.UserTask
-	for rows.Next() {
-		var userTask model.UserTask
-		var completedAt sql.NullTime
-
-		err := rows.Scan(
-			&userTask.ID,
-			&userTask.UserID,
-			&userTask.TaskID,
-			&userTask.IsCompleted,
-			&completedAt,
-			&userTask.CreatedAt,
-			&userTask.UpdatedAt,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		if completedAt.Valid {
-			userTask.CompletedAt = &completedAt.Time
-		}
-
-		userTasks = append(userTasks, &userTask)
-	}
-
-	if err = rows.Err(); err != nil {
+	if err = cursor.All(ctx, &userTasks); err != nil {
 		return nil, err
 	}
 
@@ -317,93 +216,68 @@ func (r *UserTaskRepository) FindByUserID(userID int64) ([]*model.UserTask, erro
 }
 
 func (r *UserTaskRepository) FindByUserIDAndTaskID(userID, taskID int64) (*model.UserTask, error) {
-	query := `
-		SELECT * FROM user_tasks WHERE user_id = ? AND task_id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	var userTask model.UserTask
-	var completedAt sql.NullTime
+	err := r.collection.FindOne(ctx, bson.M{
+		"user_id": userID,
+		"task_id": taskID,
+	}).Decode(&userTask)
 
-	err := r.db.QueryRow(query, userID, taskID).Scan(
-		&userTask.ID,
-		&userTask.UserID,
-		&userTask.TaskID,
-		&userTask.IsCompleted,
-		&completedAt,
-		&userTask.CreatedAt,
-		&userTask.UpdatedAt,
-	)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if err == mongo.ErrNoDocuments {
 			return nil, nil
 		}
 		return nil, err
-	}
-
-	if completedAt.Valid {
-		userTask.CompletedAt = &completedAt.Time
 	}
 
 	return &userTask, nil
 }
 
 func (r *UserTaskRepository) Update(userTask *model.UserTask) error {
-	query := `
-		UPDATE user_tasks SET
-			user_id = ?,
-			task_id = ?,
-			is_completed = ?,
-			completed_at = ?,
-			updated_at = ?
-		WHERE id = ?
-	`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
 	userTask.UpdatedAt = time.Now()
 
-	_, err := r.db.Exec(
-		query,
-		userTask.UserID,
-		userTask.TaskID,
-		userTask.IsCompleted,
-		userTask.CompletedAt,
-		userTask.UpdatedAt,
-		userTask.ID,
+	_, err := r.collection.UpdateOne(
+		ctx,
+		bson.M{"id": userTask.ID},
+		bson.M{"$set": userTask},
 	)
-	if err != nil {
-		return err
-	}
 
-	return nil
+	return err
 }
 
 func (r *UserTaskRepository) DeleteByTaskID(taskID int64) error {
-	query := `DELETE FROM user_tasks WHERE task_id = ?`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, taskID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.collection.DeleteMany(ctx, bson.M{"task_id": taskID})
+	return err
 }
 
 func (r *UserTaskRepository) DeleteByUserID(userID int64) error {
-	query := `DELETE FROM user_tasks WHERE user_id = ?`
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	_, err := r.db.Exec(query, userID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	_, err := r.collection.DeleteMany(ctx, bson.M{"user_id": userID})
+	return err
 }
 
 // CountCompletedTasksByUserID counts the number of completed tasks for a user
-func (r *UserTaskRepository) CountCompletedTasksByUserID(userID int64) (int, error) {
-	var count int
-	err := r.db.QueryRow("SELECT COUNT(*) FROM user_tasks WHERE user_id = ? AND is_completed = TRUE", userID).Scan(&count)
+func (r *UserTaskRepository) CountCompletedTasksByUserID(userID int64) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{
+		"user_id":      userID,
+		"is_completed": true,
+	})
 	if err != nil {
 		return 0, err
 	}
+
 	return count, nil
 }

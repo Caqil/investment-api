@@ -2,6 +2,7 @@ package admin
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/Caqil/investment-api/internal/model"
@@ -42,12 +43,15 @@ func (c *DashboardController) Dashboard(ctx *gin.Context) {
 
 	// Get total deposits
 	var totalDeposits float64 = 0
+	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC) // A date far in the past
+	endDate := time.Now()
+
 	depositTransactions, _ := c.transactionRepo.FindByTypeAndDate(
 		model.TransactionTypeDeposit,
-		// This is simplified for the example - would need proper date handling
-		nil, // Replace with appropriate date range
-		nil, // Replace with appropriate date range
+		&startDate,
+		&endDate,
 	)
+
 	for _, tx := range depositTransactions {
 		if tx.Status == model.TransactionStatusCompleted {
 			totalDeposits += tx.Amount

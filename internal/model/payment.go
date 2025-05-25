@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type PaymentGateway string
@@ -48,16 +50,17 @@ func (j *JSON) Scan(value interface{}) error {
 }
 
 type Payment struct {
-	ID               int64          `json:"id" db:"id"`
-	TransactionID    int64          `json:"transaction_id" db:"transaction_id"`
-	Gateway          PaymentGateway `json:"gateway" db:"gateway"`
-	GatewayReference string         `json:"gateway_reference,omitempty" db:"gateway_reference"`
-	Currency         Currency       `json:"currency" db:"currency"`
-	Amount           float64        `json:"amount" db:"amount"`
-	Status           PaymentStatus  `json:"status" db:"status"`
-	Metadata         JSON           `json:"metadata,omitempty" db:"metadata"`
-	CreatedAt        time.Time      `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time      `json:"updated_at" db:"updated_at"`
+	ID               int64              `json:"id" bson:"id"`
+	ObjectID         primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	TransactionID    int64              `json:"transaction_id" bson:"transaction_id"`
+	Gateway          PaymentGateway     `json:"gateway" bson:"gateway"`
+	GatewayReference string             `json:"gateway_reference,omitempty" bson:"gateway_reference,omitempty"`
+	Currency         Currency           `json:"currency" bson:"currency"`
+	Amount           float64            `json:"amount" bson:"amount"`
+	Status           PaymentStatus      `json:"status" bson:"status"`
+	Metadata         JSON               `json:"metadata,omitempty" bson:"metadata,omitempty"`
+	CreatedAt        time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 type PaymentResponse struct {

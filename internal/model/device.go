@@ -2,18 +2,21 @@ package model
 
 import (
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type Device struct {
-	ID          int64      `json:"id" db:"id"`
-	UserID      int64      `json:"user_id" db:"user_id"`
-	DeviceID    string     `json:"device_id" db:"device_id"`
-	DeviceName  string     `json:"device_name,omitempty" db:"device_name"`
-	DeviceModel string     `json:"device_model,omitempty" db:"device_model"`
-	LastLogin   *time.Time `json:"last_login,omitempty" db:"last_login"`
-	IsActive    bool       `json:"is_active" db:"is_active"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
+	ID          int64              `json:"id" bson:"id"`
+	ObjectID    primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	UserID      int64              `json:"user_id" bson:"user_id"`
+	DeviceID    string             `json:"device_id" bson:"device_id"`
+	DeviceName  string             `json:"device_name,omitempty" bson:"device_name,omitempty"`
+	DeviceModel string             `json:"device_model,omitempty" bson:"device_model,omitempty"`
+	LastLogin   *time.Time         `json:"last_login,omitempty" bson:"last_login,omitempty"`
+	IsActive    bool               `json:"is_active" bson:"is_active"`
+	CreatedAt   time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 type DeviceResponse struct {

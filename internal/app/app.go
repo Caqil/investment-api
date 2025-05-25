@@ -1,14 +1,13 @@
 package app
 
 import (
-	"database/sql"
-
 	"github.com/Caqil/investment-api/config"
 	"github.com/Caqil/investment-api/internal/admin"
 	"github.com/Caqil/investment-api/internal/controller"
 	"github.com/Caqil/investment-api/internal/middleware"
 	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/Caqil/investment-api/internal/service"
+	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/Caqil/investment-api/pkg/utils"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/sessions"
@@ -18,14 +17,14 @@ import (
 
 type App struct {
 	config     *config.Config
-	db         *sql.DB
+	mongoConn  *database.MongoDBConnection
 	jwtService *service.JWTService
 }
 
-func NewApp(config *config.Config, db *sql.DB) *App {
+func NewApp(config *config.Config, mongoConn *database.MongoDBConnection) *App {
 	return &App{
 		config:     config,
-		db:         db,
+		mongoConn:  mongoConn,
 		jwtService: service.NewJWTService(config.JWT.Secret, config.JWT.ExpiresIn),
 	}
 }
@@ -58,15 +57,15 @@ func (a *App) SetupRoutes() *gin.Engine {
 	}))
 
 	// Initialize repositories
-	userRepo := repository.NewUserRepository(a.db)
-	transactionRepo := repository.NewTransactionRepository(a.db)
-	paymentRepo := repository.NewPaymentRepository(a.db)
-	planRepo := repository.NewPlanRepository(a.db)
-	withdrawalRepo := repository.NewWithdrawalRepository(a.db)
-	taskRepo := repository.NewTaskRepository(a.db)
-	kycRepo := repository.NewKYCRepository(a.db)
-	deviceRepo := repository.NewDeviceRepository(a.db)
-	notificationRepo := repository.NewNotificationRepository(a.db)
+	userRepo := repository.NewUserRepository(a.mongoConn)
+	transactionRepo := repository.NewTransactionRepository(a.mongoConn)
+	paymentRepo := repository.NewPaymentRepository(a.mongoConn)
+	planRepo := repository.NewPlanRepository(a.mongoConn)
+	withdrawalRepo := repository.NewWithdrawalRepository(a.mongoConn)
+	taskRepo := repository.NewTaskRepository(a.mongoConn)
+	kycRepo := repository.NewKYCRepository(a.mongoConn)
+	deviceRepo := repository.NewDeviceRepository(a.mongoConn)
+	notificationRepo := repository.NewNotificationRepository(a.mongoConn)
 
 	// Initialize services
 	deviceService := service.NewDeviceService(deviceRepo)
@@ -240,7 +239,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 	}
 
 	// Initialize admin components with factory
-	adminFactory := admin.NewFactory(a.db, a.config, a.jwtService.GetJWTManager())
+	adminFactory := admin.NewFactory(a.mongoConn, a.config, a.jwtService.GetJWTManager())
 
 	// Create admin components
 	adminSetup := adminFactory.CreateAdminSetup()
@@ -249,7 +248,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 
 	// Create admin service
 	adminService := service.NewAdminService(
-		a.db,
+		a.mongoConn,
 		a.config,
 		adminSetup,
 		adminAuthController,

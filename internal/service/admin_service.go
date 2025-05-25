@@ -1,10 +1,9 @@
 package service
 
 import (
-	"database/sql"
-
 	"github.com/Caqil/investment-api/config"
 	"github.com/Caqil/investment-api/internal/interfaces"
+	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -12,7 +11,7 @@ import (
 
 // AdminService coordinates the admin functionality
 type AdminService struct {
-	DB                  *sql.DB
+	MongoConn           *database.MongoDBConnection
 	Config              *config.Config
 	AdminSetup          interfaces.AdminInterface
 	AuthController      interfaces.AdminAuthInterface
@@ -21,14 +20,14 @@ type AdminService struct {
 
 // NewAdminService creates a new admin service
 func NewAdminService(
-	db *sql.DB,
+	mongoConn *database.MongoDBConnection,
 	cfg *config.Config,
 	adminSetup interfaces.AdminInterface,
 	authController interfaces.AdminAuthInterface,
 	dashboardController interfaces.DashboardInterface,
 ) *AdminService {
 	return &AdminService{
-		DB:                  db,
+		MongoConn:           mongoConn,
 		Config:              cfg,
 		AdminSetup:          adminSetup,
 		AuthController:      authController,

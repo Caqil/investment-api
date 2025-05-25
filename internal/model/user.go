@@ -2,26 +2,29 @@ package model
 
 import (
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type User struct {
-	ID               int64     `json:"id" db:"id"`
-	Name             string    `json:"name" db:"name"`
-	Email            string    `json:"email" db:"email"`
-	PasswordHash     string    `json:"-" db:"password_hash"`
-	Phone            string    `json:"phone" db:"phone"`
-	Balance          float64   `json:"balance" db:"balance"`
-	ReferralCode     string    `json:"referral_code" db:"referral_code"`
-	ReferredBy       *int64    `json:"referred_by,omitempty" db:"referred_by"`
-	PlanID           int64     `json:"plan_id" db:"plan_id"`
-	IsKYCVerified    bool      `json:"is_kyc_verified" db:"is_kyc_verified"`
-	EmailVerified    bool      `json:"email_verified" db:"email_verified"`
-	IsAdmin          bool      `json:"is_admin,omitempty" db:"is_admin"`
-	IsBlocked        bool      `json:"is_blocked" db:"is_blocked"`
-	BiometricEnabled bool      `json:"biometric_enabled" db:"biometric_enabled"`
-	ProfilePicURL    string    `json:"profile_pic_url" db:"profile_pic_url"`
-	CreatedAt        time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
+	ID               int64              `json:"id" bson:"id"`
+	ObjectID         primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	Name             string             `json:"name" bson:"name"`
+	Email            string             `json:"email" bson:"email"`
+	PasswordHash     string             `json:"-" bson:"password_hash"`
+	Phone            string             `json:"phone" bson:"phone"`
+	Balance          float64            `json:"balance" bson:"balance"`
+	ReferralCode     string             `json:"referral_code" bson:"referral_code"`
+	ReferredBy       *int64             `json:"referred_by,omitempty" bson:"referred_by,omitempty"`
+	PlanID           int64              `json:"plan_id" bson:"plan_id"`
+	IsKYCVerified    bool               `json:"is_kyc_verified" bson:"is_kyc_verified"`
+	EmailVerified    bool               `json:"email_verified" bson:"email_verified"`
+	IsAdmin          bool               `json:"is_admin,omitempty" bson:"is_admin"`
+	IsBlocked        bool               `json:"is_blocked" bson:"is_blocked"`
+	BiometricEnabled bool               `json:"biometric_enabled" bson:"biometric_enabled"`
+	ProfilePicURL    string             `json:"profile_pic_url" bson:"profile_pic_url"`
+	CreatedAt        time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 type UserResponse struct {

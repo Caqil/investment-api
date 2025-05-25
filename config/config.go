@@ -10,11 +10,10 @@ type Config struct {
 		Port string
 	}
 	Database struct {
-		Host     string
-		Port     string
-		Username string
-		Password string
-		Name     string
+		URI            string // MongoDB URI
+		Name           string // Database name
+		ConnectTimeout int    // Connection timeout in seconds
+		MaxPoolSize    uint64 // Maximum connection pool size
 	}
 	JWT struct {
 		Secret    string
@@ -49,11 +48,11 @@ func NewConfig() *Config {
 	cfg.Server.Port = getEnv("SERVER_PORT", "8080")
 
 	// Database configuration
-	cfg.Database.Host = getEnv("DB_HOST", "localhost")
-	cfg.Database.Port = getEnv("DB_PORT", "3306")
-	cfg.Database.Username = getEnv("DB_USERNAME", "root")
-	cfg.Database.Password = getEnv("DB_PASSWORD", "")
-	cfg.Database.Name = getEnv("DB_NAME", "investment_app")
+	cfg.Database.URI = getEnv("MONGODB_URI", "mongodb://localhost:27017")
+	cfg.Database.Name = getEnv("MONGODB_NAME", "investment_app")
+	cfg.Database.ConnectTimeout, _ = strconv.Atoi(getEnv("MONGODB_CONNECT_TIMEOUT", "10"))
+	maxPoolSize, _ := strconv.ParseUint(getEnv("MONGODB_MAX_POOL_SIZE", "100"), 10, 64)
+	cfg.Database.MaxPoolSize = maxPoolSize
 
 	// JWT configuration
 	cfg.JWT.Secret = getEnv("JWT_SECRET", "your-secret-key")

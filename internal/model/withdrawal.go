@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type WithdrawalStatus string
@@ -40,17 +42,18 @@ func (p *PaymentDetails) Scan(value interface{}) error {
 }
 
 type Withdrawal struct {
-	ID             int64            `json:"id" db:"id"`
-	TransactionID  int64            `json:"transaction_id" db:"transaction_id"`
-	UserID         int64            `json:"user_id" db:"user_id"`
-	Amount         float64          `json:"amount" db:"amount"`
-	PaymentMethod  string           `json:"payment_method" db:"payment_method"`
-	PaymentDetails PaymentDetails   `json:"payment_details" db:"payment_details"`
-	Status         WithdrawalStatus `json:"status" db:"status"`
-	AdminNote      string           `json:"admin_note,omitempty" db:"admin_note"`
-	TasksCompleted bool             `json:"tasks_completed" db:"tasks_completed"`
-	CreatedAt      time.Time        `json:"created_at" db:"created_at"`
-	UpdatedAt      time.Time        `json:"updated_at" db:"updated_at"`
+	ID             int64              `json:"id" bson:"id"`
+	ObjectID       primitive.ObjectID `json:"-" bson:"_id,omitempty"`
+	TransactionID  int64              `json:"transaction_id" bson:"transaction_id"`
+	UserID         int64              `json:"user_id" bson:"user_id"`
+	Amount         float64            `json:"amount" bson:"amount"`
+	PaymentMethod  string             `json:"payment_method" bson:"payment_method"`
+	PaymentDetails PaymentDetails     `json:"payment_details" bson:"payment_details"`
+	Status         WithdrawalStatus   `json:"status" bson:"status"`
+	AdminNote      string             `json:"admin_note,omitempty" bson:"admin_note,omitempty"`
+	TasksCompleted bool               `json:"tasks_completed" bson:"tasks_completed"`
+	CreatedAt      time.Time          `json:"created_at" bson:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at" bson:"updated_at"`
 }
 
 type WithdrawalResponse struct {
