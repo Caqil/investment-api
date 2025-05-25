@@ -4,26 +4,29 @@ import (
 	"database/sql"
 
 	"github.com/Caqil/investment-api/config"
+	"github.com/Caqil/investment-api/internal/admin"
 	"github.com/Caqil/investment-api/internal/controller"
 	"github.com/Caqil/investment-api/internal/middleware"
 	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/Caqil/investment-api/internal/service"
 	"github.com/Caqil/investment-api/pkg/utils"
 	"github.com/gin-contrib/cors"
+	"github.com/gin-contrib/sessions"
+	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 )
 
 type App struct {
 	config     *config.Config
 	db         *sql.DB
-	jwtManager *utils.JWTManager
+	jwtService *service.JWTService
 }
 
 func NewApp(config *config.Config, db *sql.DB) *App {
 	return &App{
 		config:     config,
 		db:         db,
-		jwtManager: utils.NewJWTManager(config.JWT.Secret, config.JWT.ExpiresIn),
+		jwtService: service.NewJWTService(config.JWT.Secret, config.JWT.ExpiresIn),
 	}
 }
 
@@ -32,6 +35,17 @@ func (a *App) SetupRoutes() *gin.Engine {
 	// gin.SetMode(gin.ReleaseMode)
 
 	r := gin.Default()
+
+	// Load templates
+	r.LoadHTMLGlob("templates/**/*")
+
+	// Serve static files
+	r.Static("/static", "./public/static")
+	r.Static("/admin/assets", "./public/admin")
+
+	// Set up session middleware
+	store := cookie.NewStore([]byte(a.config.JWT.Secret))
+	r.Use(sessions.Sessions("investment_app_session", store))
 
 	// CORS configuration
 	r.Use(cors.New(cors.Config{
@@ -57,7 +71,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 	// Initialize services
 	deviceService := service.NewDeviceService(deviceRepo)
 	emailService := utils.NewEmailService(a.config.Email)
-	authService := service.NewAuthService(userRepo, a.jwtManager, emailService)
+	authService := service.NewAuthService(userRepo, a.jwtService.GetJWTManager(), emailService)
 	userService := service.NewUserService(userRepo, deviceRepo)
 	planService := service.NewPlanService(planRepo)
 	paymentService := service.NewPaymentService(paymentRepo, transactionRepo, userRepo, a.config.Payment)
@@ -105,11 +119,11 @@ func (a *App) SetupRoutes() *gin.Engine {
 		planService,
 		taskService,
 		notificationService,
-		bonusService, // Add this parameter
+		bonusService,
 	)
 
 	// Initialize middleware
-	authMiddleware := middleware.NewAuthMiddleware(a.jwtManager, userRepo)
+	authMiddleware := middleware.NewAuthMiddleware(a.jwtService.GetJWTManager(), userRepo)
 	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService)
 	adminMiddleware := middleware.NewAdminMiddleware(userRepo)
 
@@ -190,39 +204,66 @@ func (a *App) SetupRoutes() *gin.Engine {
 		}
 	}
 
-	// Admin routes
-	admin := api.Group("/admin")
-	admin.Use(authMiddleware.Authenticate())
-	admin.Use(adminMiddleware.EnsureAdmin())
+	// Admin API routes
+	adminAPI := api.Group("/admin")
+	adminAPI.Use(authMiddleware.Authenticate())
+	adminAPI.Use(adminMiddleware.EnsureAdmin())
 	{
 		// Admin user management
-		admin.GET("/users", adminController.GetAllUsers)
-		admin.GET("/users/:id", adminController.GetUserDetails)
-		admin.PUT("/users/:id/block", adminController.BlockUser)
-		admin.PUT("/users/:id/unblock", adminController.UnblockUser)
+		adminAPI.GET("/users", adminController.GetAllUsers)
+		adminAPI.GET("/users/:id", adminController.GetUserDetails)
+		adminAPI.PUT("/users/:id/block", adminController.BlockUser)
+		adminAPI.PUT("/users/:id/unblock", adminController.UnblockUser)
 
 		// Admin withdrawal management
-		admin.GET("/withdrawals", adminController.GetAllWithdrawals)
-		admin.PUT("/withdrawals/:id/approve", adminController.ApproveWithdrawal)
-		admin.PUT("/withdrawals/:id/reject", adminController.RejectWithdrawal)
+		adminAPI.GET("/withdrawals", adminController.GetAllWithdrawals)
+		adminAPI.PUT("/withdrawals/:id/approve", adminController.ApproveWithdrawal)
+		adminAPI.PUT("/withdrawals/:id/reject", adminController.RejectWithdrawal)
 
 		// Admin KYC management
-		admin.GET("/kyc", adminController.GetAllKYCSubmissions)
-		admin.PUT("/kyc/:id/approve", adminController.ApproveKYC)
-		admin.PUT("/kyc/:id/reject", adminController.RejectKYC)
+		adminAPI.GET("/kyc", adminController.GetAllKYCSubmissions)
+		adminAPI.PUT("/kyc/:id/approve", adminController.ApproveKYC)
+		adminAPI.PUT("/kyc/:id/reject", adminController.RejectKYC)
 
 		// Admin plan management
-		admin.POST("/plans", adminController.CreatePlan)
-		admin.PUT("/plans/:id", adminController.UpdatePlan)
-		admin.DELETE("/plans/:id", adminController.DeletePlan)
+		adminAPI.POST("/plans", adminController.CreatePlan)
+		adminAPI.PUT("/plans/:id", adminController.UpdatePlan)
+		adminAPI.DELETE("/plans/:id", adminController.DeletePlan)
 
 		// Admin task management
-		admin.POST("/tasks", adminController.CreateTask)
-		admin.PUT("/tasks/:id", adminController.UpdateTask)
-		admin.DELETE("/tasks/:id", adminController.DeleteTask)
+		adminAPI.POST("/tasks", adminController.CreateTask)
+		adminAPI.PUT("/tasks/:id", adminController.UpdateTask)
+		adminAPI.DELETE("/tasks/:id", adminController.DeleteTask)
 
 		// Admin notification management
-		admin.POST("/notifications", adminController.SendNotification)
+		adminAPI.POST("/notifications", adminController.SendNotification)
+	}
+
+	// Initialize and mount admin interface
+	adminFactory := admin.NewFactory(a.db, a.config, a.jwtService.GetJWTManager())
+
+	// Create admin setup
+	adminSetup := adminFactory.CreateAdminSetup()
+
+	// Create admin controllers
+	adminAuthController := adminFactory.CreateAdminAuthController()
+	dashboardController := adminFactory.CreateDashboardController()
+
+	// Set up admin web interface routes
+	adminRoutes := r.Group("/admin")
+
+	// Login routes (no auth required)
+	adminRoutes.GET("/login", adminAuthController.LoginForm)
+	adminRoutes.POST("/login", adminAuthController.Login)
+
+	// Protected admin routes
+	adminRoutes.Use(adminAuthController.RequireAdmin())
+	{
+		adminRoutes.GET("/", dashboardController.Dashboard)
+		adminRoutes.GET("/logout", adminAuthController.Logout)
+
+		// Mount Qor Admin
+		adminSetup.MountTo("/admin", r)
 	}
 
 	return r
