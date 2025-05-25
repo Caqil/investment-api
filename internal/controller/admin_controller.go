@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Caqil/investment-api/internal/model"
+	"github.com/Caqil/investment-api/internal/service"
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/investment-api/internal/model"
-	"github.com/yourusername/investment-api/internal/service"
 )
 
 type AdminController struct {

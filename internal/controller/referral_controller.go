@@ -3,9 +3,9 @@ package controller
 import (
 	"net/http"
 
+	"github.com/Caqil/investment-api/internal/middleware"
+	"github.com/Caqil/investment-api/internal/service"
 	"github.com/gin-gonic/gin"
-	"github.com/yourusername/investment-api/internal/middleware"
-	"github.com/yourusername/investment-api/internal/service"
 )
 
 type ReferralController struct {

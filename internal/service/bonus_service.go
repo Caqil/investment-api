@@ -9,9 +9,10 @@ import (
 )
 
 type BonusService struct {
-	userRepo        *repository.UserRepository
-	transactionRepo *repository.TransactionRepository
-	config          struct {
+	userRepo         *repository.UserRepository
+	transactionRepo  *repository.TransactionRepository
+	notificationRepo *repository.NotificationRepository
+	config           struct {
 		DailyBonusPercentage     float64
 		ReferralBonusAmount      float64
 		ReferralProfitPercentage float64
@@ -45,6 +46,11 @@ func (s *BonusService) CalculateDailyBonus(userID int64) error {
 		return fmt.Errorf("user not found")
 	}
 
+	// Skip if user is blocked
+	if user.IsBlocked {
+		return nil
+	}
+
 	// Calculate bonus amount (5% of total balance)
 	bonusAmount := user.Balance * (s.config.DailyBonusPercentage / 100)
 	if bonusAmount <= 0 {
@@ -72,6 +78,33 @@ func (s *BonusService) CalculateDailyBonus(userID int64) error {
 		return err
 	}
 
+	// Create notification if notification repository is set
+	if s.notificationRepo != nil {
+		notification := &model.Notification{
+			UserID:  userID,
+			Title:   "Daily Bonus Received",
+			Message: fmt.Sprintf("You have received a daily bonus of %.2f BDT, which has been added to your balance.", bonusAmount),
+			Type:    model.NotificationTypeBonus,
+			IsRead:  false,
+		}
+		_, err = s.notificationRepo.Create(notification)
+		if err != nil {
+			// Log error but continue
+			// In a real app, this would use a proper logging system
+			fmt.Printf("Error creating notification: %v\n", err)
+		}
+	}
+
+	// Process referral profit bonus if user has a referrer
+	if user.ReferredBy != nil {
+		err = s.ProcessReferralProfitBonus(userID, *user.ReferredBy, bonusAmount)
+		if err != nil {
+			// Log error but continue
+			// In a real app, this would use a proper logging system
+			fmt.Printf("Error processing referral profit bonus: %v\n", err)
+		}
+	}
+
 	return nil
 }
 
@@ -93,7 +126,8 @@ func (s *BonusService) CalculateDailyBonusForAllUsers() error {
 		// Calculate and add bonus for each user
 		if err := s.CalculateDailyBonus(user.ID); err != nil {
 			// Log error but continue with other users
-			// TODO: Add proper logging
+			// In a real app, this would use a proper logging system
+			fmt.Printf("Error calculating daily bonus for user %d: %v\n", user.ID, err)
 			continue
 		}
 	}
@@ -160,12 +194,43 @@ func (s *BonusService) ProcessReferralBonus(userID, referrerID int64) error {
 		return err
 	}
 
+	// Create notifications if notification repository is set
+	if s.notificationRepo != nil {
+		// Notification for user
+		userNotification := &model.Notification{
+			UserID:  userID,
+			Title:   "Referral Bonus Received",
+			Message: fmt.Sprintf("You have received a referral bonus of %.2f BDT for being referred by %s.", s.config.ReferralBonusAmount, referrer.Name),
+			Type:    model.NotificationTypeBonus,
+			IsRead:  false,
+		}
+		_, err = s.notificationRepo.Create(userNotification)
+		if err != nil {
+			// Log error but continue
+			fmt.Printf("Error creating user notification: %v\n", err)
+		}
+
+		// Notification for referrer
+		referrerNotification := &model.Notification{
+			UserID:  referrerID,
+			Title:   "Referral Bonus Received",
+			Message: fmt.Sprintf("You have received a referral bonus of %.2f BDT for referring %s.", s.config.ReferralBonusAmount, user.Name),
+			Type:    model.NotificationTypeBonus,
+			IsRead:  false,
+		}
+		_, err = s.notificationRepo.Create(referrerNotification)
+		if err != nil {
+			// Log error but continue
+			fmt.Printf("Error creating referrer notification: %v\n", err)
+		}
+	}
+
 	return nil
 }
 
 // ProcessReferralProfitBonus processes the referral profit bonus
 // This should be called when a user receives a profit (e.g., daily bonus)
-func (s *BonusService) ProcessReferralProfitBonus(userID int64, profitAmount float64) error {
+func (s *BonusService) ProcessReferralProfitBonus(userID, referrerID int64, profitAmount float64) error {
 	// Get user
 	user, err := s.userRepo.FindByID(userID)
 	if err != nil {
@@ -175,14 +240,6 @@ func (s *BonusService) ProcessReferralProfitBonus(userID int64, profitAmount flo
 		return fmt.Errorf("user not found")
 	}
 
-	// Check if user has a referrer
-	if user.ReferredBy == nil {
-		// No referrer, no bonus to process
-		return nil
-	}
-
-	referrerID := *user.ReferredBy
-
 	// Get referrer
 	referrer, err := s.userRepo.FindByID(referrerID)
 	if err != nil {
@@ -190,6 +247,11 @@ func (s *BonusService) ProcessReferralProfitBonus(userID int64, profitAmount flo
 	}
 	if referrer == nil {
 		return fmt.Errorf("referrer not found")
+	}
+
+	// Skip if referrer is blocked
+	if referrer.IsBlocked {
+		return nil
 	}
 
 	// Calculate bonus amount (10% of profit)
@@ -219,6 +281,22 @@ func (s *BonusService) ProcessReferralProfitBonus(userID int64, profitAmount flo
 		return err
 	}
 
+	// Create notification if notification repository is set
+	if s.notificationRepo != nil {
+		notification := &model.Notification{
+			UserID:  referrerID,
+			Title:   "Referral Profit Received",
+			Message: fmt.Sprintf("You have received %.2f BDT as profit from your referral %s.", bonusAmount, user.Name),
+			Type:    model.NotificationTypeBonus,
+			IsRead:  false,
+		}
+		_, err = s.notificationRepo.Create(notification)
+		if err != nil {
+			// Log error but continue
+			fmt.Printf("Error creating notification: %v\n", err)
+		}
+	}
+
 	return nil
 }
 
@@ -229,28 +307,38 @@ func (s *BonusService) GetUserReferralEarnings(userID int64) (float64, error) {
 	startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, endDate.Location()) // Start from a long time ago
 
 	// Get total referral bonus
-	var totalReferralBonus float64
-	rows, err := s.transactionRepo.FindByTypeAndDate(model.TransactionTypeReferralBonus, startDate, endDate)
+	var totalReferralBonus float64 = 0
+	referralBonusTxs, err := s.transactionRepo.FindByTypeAndUserID(
+		userID,
+		model.TransactionTypeReferralBonus,
+		startDate,
+		endDate,
+	)
 	if err != nil {
 		return 0, err
 	}
 
-	for _, transaction := range rows {
-		if transaction.UserID == userID && transaction.Status == model.TransactionStatusCompleted {
-			totalReferralBonus += transaction.Amount
+	for _, tx := range referralBonusTxs {
+		if tx.Status == model.TransactionStatusCompleted {
+			totalReferralBonus += tx.Amount
 		}
 	}
 
 	// Get total referral profit
-	var totalReferralProfit float64
-	rows, err = s.transactionRepo.FindByTypeAndDate(model.TransactionTypeReferralProfit, startDate, endDate)
+	var totalReferralProfit float64 = 0
+	referralProfitTxs, err := s.transactionRepo.FindByTypeAndUserID(
+		userID,
+		model.TransactionTypeReferralProfit,
+		startDate,
+		endDate,
+	)
 	if err != nil {
 		return 0, err
 	}
 
-	for _, transaction := range rows {
-		if transaction.UserID == userID && transaction.Status == model.TransactionStatusCompleted {
-			totalReferralProfit += transaction.Amount
+	for _, tx := range referralProfitTxs {
+		if tx.Status == model.TransactionStatusCompleted {
+			totalReferralProfit += tx.Amount
 		}
 	}
 
@@ -264,4 +352,10 @@ func (s *BonusService) GetUserTotalReferrals(userID int64) (int, error) {
 		return 0, err
 	}
 	return len(referrals), nil
+}
+
+// SetNotificationRepo sets the notification repository
+// This is useful when the bonus service is created before the notification repository
+func (s *BonusService) SetNotificationRepo(notificationRepo *repository.NotificationRepository) {
+	s.notificationRepo = notificationRepo
 }

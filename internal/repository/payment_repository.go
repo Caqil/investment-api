@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/yourusername/investment-api/internal/model"
+	"github.com/Caqil/investment-api/internal/model"
 )
 
 type PaymentRepository struct {
