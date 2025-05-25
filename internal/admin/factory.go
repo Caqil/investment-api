@@ -59,8 +59,9 @@ type SimpleAdminSetup struct{}
 
 // MountTo mounts the admin interface to the given path
 func (s *SimpleAdminSetup) MountTo(mountPath string, router *gin.Engine) {
-	// Just add a simple handler for the admin path
-	router.GET(mountPath, func(c *gin.Context) {
+	// Use a more specific path to avoid conflict with the root /admin path
+	// Change from router.GET(mountPath, ...) to router.GET(mountPath + "/dashboard", ...)
+	router.GET(mountPath+"/dashboard", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "admin/dashboard.html", gin.H{
 			"title":              "Admin Dashboard",
 			"totalUsers":         0,

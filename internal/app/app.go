@@ -1,9 +1,9 @@
 package app
 
 import (
+	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/Caqil/investment-api/config"
 	"github.com/Caqil/investment-api/internal/admin"
@@ -39,12 +39,11 @@ func (a *App) SetupRoutes() *gin.Engine {
 
 	r := gin.Default()
 
-	templateDir := "templates"
-	if _, err := os.Stat(templateDir); !os.IsNotExist(err) {
-		templatePattern := filepath.Join(templateDir, "**", "*")
-		matches, err := filepath.Glob(templatePattern)
-		if err == nil && len(matches) > 0 {
-			r.LoadHTMLGlob(templatePattern)
+	if _, err := os.Stat("templates"); os.IsNotExist(err) {
+		// Create the templates directory if it doesn't exist
+		err = os.MkdirAll("templates/admin", 0755)
+		if err != nil {
+			log.Printf("Warning: Failed to create templates directory: %v", err)
 		}
 	}
 
@@ -138,20 +137,8 @@ func (a *App) SetupRoutes() *gin.Engine {
 	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService)
 	adminMiddleware := middleware.NewAdminMiddleware(userRepo)
 	r.GET("/admin", func(c *gin.Context) {
-		if _, err := os.Stat("templates/admin/dashboard.html"); !os.IsNotExist(err) {
-			c.HTML(http.StatusOK, "admin/dashboard.html", gin.H{
-				"title":              "Admin Dashboard",
-				"totalUsers":         0,
-				"totalDeposits":      0,
-				"pendingWithdrawals": 0,
-				"recentTransactions": []interface{}{},
-				"pendingKYC":         []interface{}{},
-			})
-		} else {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "Admin interface available via API only. Web interface is being configured.",
-			})
-		}
+		// Redirect to the dashboard route that will be handled by AdminSetup
+		c.Redirect(http.StatusFound, "/admin/dashboard")
 	})
 	// Public routes
 	api := r.Group("/api")

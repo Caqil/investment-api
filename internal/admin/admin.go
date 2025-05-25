@@ -187,19 +187,19 @@ func (as *AdminSetup) addCustomPages() {
 	})
 }
 
-// MountTo mounts the admin interface to the given path
-func (as *AdminSetup) MountTo(mountPath string, router *gin.Engine) {
-	// Create a new HTTP mux
-	mux := http.NewServeMux()
-
-	// Mount admin to the mux
-	as.Admin.MountTo(mountPath, mux)
-
-	// Use Gin adapter to serve the admin interface
-	router.Any(fmt.Sprintf("%s/*resource", mountPath), gin.WrapH(mux))
-
-	// Serve admin UI assets
-	router.StaticFS("/admin/assets", http.Dir("public/admin"))
+// Fix for the SimpleAdminSetup.MountTo method in factory.go
+func (s *AdminSetup) MountTo(mountPath string, router *gin.Engine) {
+	// Ensure we use a template name that exists in the templates directory
+	router.GET(mountPath+"/dashboard", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "admin/dashboard.html", gin.H{
+			"title":              "Admin Dashboard",
+			"totalUsers":         0,
+			"totalDeposits":      0,
+			"pendingWithdrawals": 0,
+			"recentTransactions": []interface{}{},
+			"pendingKYC":         []interface{}{},
+		})
+	})
 }
 
 // SetupAuth sets up authentication for the admin interface

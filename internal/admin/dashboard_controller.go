@@ -35,8 +35,6 @@ func NewDashboardController(
 		kycRepo:         kycRepo,
 	}
 }
-
-// Dashboard renders the admin dashboard
 func (c *DashboardController) Dashboard(ctx *gin.Context) {
 	// Get dashboard data
 	totalUsers, _ := c.userRepo.CountAll()
@@ -67,6 +65,7 @@ func (c *DashboardController) Dashboard(ctx *gin.Context) {
 	// Get pending KYC verifications
 	pendingKYC, _ := c.kycRepo.FindByStatus(model.KYCStatusPending, 10, 0) // Last 10 pending KYC docs
 
+	// Make sure we're using the exact template name that's loaded
 	ctx.HTML(http.StatusOK, "admin/dashboard.html", gin.H{
 		"title":              "Admin Dashboard",
 		"totalUsers":         totalUsers,
