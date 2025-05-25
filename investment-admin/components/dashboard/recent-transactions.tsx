@@ -1,298 +1,229 @@
+// src/components/dashboard/recent-transactions.tsx
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatCurrency, formatDate } from "@/lib/utils";
 import {
   Transaction,
   TransactionStatus,
   TransactionType,
 } from "@/types/transaction";
-import {
-  ArrowDown,
-  ArrowUp,
-  Gift,
-  ChevronRight,
-  CreditCard,
-  RefreshCw,
-} from "lucide-react";
+import { User } from "@/types/auth";
+import { formatDate, formatCurrency } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface RecentTransactionsProps {
+  limit?: number;
+  className?: string;
+  // Add the new props
   transactions?: Transaction[];
   loading?: boolean;
   showUser?: boolean;
-  userId?: number;
-  limit?: number;
-  showRefreshButton?: boolean;
+  users?: User[];
+  title?: string;
 }
 
 export function RecentTransactions({
-  transactions: initialTransactions,
-  loading: initialLoading = false,
-  showUser = false,
-  userId,
   limit = 5,
-  showRefreshButton = false,
+  className,
+  transactions: externalTransactions,
+  loading: externalLoading,
+  showUser = false,
+  users = [],
+  title = "Recent Transactions",
 }: RecentTransactionsProps) {
-  const router = useRouter();
-  const [transactions, setTransactions] = useState<Transaction[]>(
-    initialTransactions || []
-  );
-  const [loading, setLoading] = useState<boolean>(
-    initialLoading || !initialTransactions
-  );
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [users, setUsers] = useState<any[]>([]);
 
-  // Fetch transactions if not provided as props
-  const fetchTransactions = async () => {
-    if (initialTransactions && !showRefreshButton) return;
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      let response;
-
-      if (userId) {
-        // Fetch transactions for a specific user
-        response = await api.transactions.getByUserId(userId);
-      } else {
-        // Fetch recent transactions
-        response = await api.transactions.getRecentTransactions(limit);
-      }
-
-      if (response.error) {
-        setError(response.error);
-        return;
-      }
-
-      // First check if data exists and is an object
-      if (
-        response.data &&
-        typeof response.data === "object" &&
-        "transactions" in response.data
-      ) {
-        setTransactions(response.data.transactions || []);
-      } else {
-        setTransactions([]);
-        console.warn(
-          "API response didn't include expected 'transactions' property:",
-          response.data
-        );
-      }
-    } catch (err) {
-      setError("Failed to load transactions");
-      console.error("Error fetching transactions:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch users if showing user info
-  const fetchUsers = async () => {
-    if (!showUser) return;
-
-    try {
-      const response = await api.users.getAll();
-
-      if (response.error) {
-        console.error("Error fetching users:", response.error);
-        return;
-      }
-
-      // Check if data exists and is an object
-      if (
-        response.data &&
-        typeof response.data === "object" &&
-        "users" in response.data
-      ) {
-        setUsers(response.data.users || []);
-      }
-    } catch (err) {
-      console.error("Error fetching users:", err);
-    }
-  };
-
+  // Only fetch transactions if they're not provided externally
   useEffect(() => {
-    fetchTransactions();
-    fetchUsers();
-  }, [userId, limit]);
+    if (externalTransactions) {
+      setTransactions(externalTransactions.slice(0, limit));
+      setLoading(false);
+      return;
+    }
 
-  // Helper to get user name from user ID
-  const getUserName = (userId: number | undefined) => {
-    if (!userId) return "Unknown User";
-    const user = users.find((u) => u.id === userId);
-    return user ? user.name : "Unknown User";
+    const fetchTransactions = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.transactions.getAll();
+
+        if (response.error) {
+          throw new Error(response.error);
+        }
+
+        if (response.data?.transactions) {
+          // Sort by date (newest first) and limit
+          const sortedTransactions = [...response.data.transactions]
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime()
+            )
+            .slice(0, limit);
+
+          setTransactions(sortedTransactions);
+        } else {
+          setTransactions([]);
+        }
+      } catch (err) {
+        console.error("Error fetching transactions:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to load transactions"
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTransactions();
+  }, [limit, externalTransactions]);
+
+  // Helper function to get user by ID
+  const getUserById = (userId: number): User | undefined => {
+    return users.find((user) => user.id === userId);
   };
 
-  // Helper to get transaction icon
-  const getTransactionIcon = (type: TransactionType) => {
+  // Helper function to get badge variant based on transaction type
+  const getTypeBadgeVariant = (type: TransactionType) => {
     switch (type) {
       case TransactionType.DEPOSIT:
-        return <ArrowDown className="h-4 w-4 text-green-500" />;
+        return "success";
       case TransactionType.WITHDRAWAL:
-        return <ArrowUp className="h-4 w-4 text-yellow-500" />;
+        return "warning";
       case TransactionType.BONUS:
-        return <Gift className="h-4 w-4 text-blue-500" />;
+        return "secondary";
+      case TransactionType.REFERRAL_BONUS:
+        return "info";
+      case TransactionType.PLAN_PURCHASE:
+        return "destructive";
+      case TransactionType.REFERRAL_PROFIT:
+        return "default";
       default:
-        return <CreditCard className="h-4 w-4 text-gray-500" />;
+        return "secondary";
     }
   };
 
-  // Helper to get transaction status badge
-  const getStatusBadge = (status: TransactionStatus) => {
+  // Helper function to get badge variant based on transaction status
+  const getStatusBadgeVariant = (status: TransactionStatus) => {
     switch (status) {
       case TransactionStatus.COMPLETED:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-green-50 text-green-700 border-green-200"
-          >
-            Completed
-          </Badge>
-        );
+        return "success";
       case TransactionStatus.PENDING:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-yellow-50 text-yellow-700 border-yellow-200"
-          >
-            Pending
-          </Badge>
-        );
+        return "warning";
       case TransactionStatus.REJECTED:
-        return <Badge variant="destructive">Rejected</Badge>;
+        return "destructive";
       default:
-        return null;
+        return "secondary";
     }
   };
 
+  // Helper function to get initials from name
+  const getInitials = (name: string): string => {
+    return name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase();
+  };
+
+  // Use external loading state if provided
+  const isLoading = externalLoading !== undefined ? externalLoading : loading;
+
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div>
-          <CardTitle>Recent Transactions</CardTitle>
-          <CardDescription>
-            Latest financial activity on the platform
-          </CardDescription>
-        </div>
-        <div className="flex gap-2">
-          {showRefreshButton && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={fetchTransactions}
-              disabled={loading}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            onClick={() => router.push("/transactions")}
-          >
-            View All
-          </Button>
-        </div>
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
       </CardHeader>
       <CardContent>
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm">
+          <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive mb-4">
             {error}
           </div>
         )}
 
-        {loading ? (
+        {isLoading ? (
           <div className="space-y-4">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center justify-between p-2">
-                <div className="flex items-center space-x-3">
-                  <Skeleton className="h-8 w-8 rounded-full" />
-                  <div className="space-y-1">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-3 w-32" />
-                  </div>
+            {Array.from({ length: limit }).map((_, index) => (
+              <div key={index} className="flex items-center gap-4">
+                {showUser && <Skeleton className="h-10 w-10 rounded-full" />}
+                <div className="space-y-2 flex-1">
+                  <Skeleton className="h-4 w-[250px]" />
+                  <Skeleton className="h-4 w-[200px]" />
                 </div>
-                <div className="text-right">
-                  <Skeleton className="h-4 w-16 ml-auto" />
-                  <Skeleton className="h-3 w-12 ml-auto mt-1" />
-                </div>
+                <Skeleton className="h-4 w-[80px]" />
               </div>
             ))}
           </div>
-        ) : transactions.length > 0 ? (
-          <div className="space-y-4">
-            {transactions.map((transaction) => (
-              <div
-                key={transaction.id}
-                className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                    {getTransactionIcon(transaction.type)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">
-                      {transaction.type.charAt(0).toUpperCase() +
-                        transaction.type.slice(1)}
-                      {showUser && transaction.user_id !== undefined && (
-                        <span className="font-normal">
-                          {" "}
-                          by {getUserName(transaction.user_id)}
-                        </span>
+        ) : transactions.length === 0 ? (
+          <div className="flex h-[150px] items-center justify-center text-muted-foreground">
+            No transactions found
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {transactions.map((transaction) => {
+              const user = showUser
+                ? getUserById(transaction.user_id)
+                : undefined;
+
+              return (
+                <div
+                  key={transaction.id}
+                  className="flex items-center gap-4 border-b pb-4 last:border-0 last:pb-0"
+                >
+                  {showUser && user && (
+                    <Avatar>
+                      <AvatarImage src={user.profile_pic_url} />
+                      <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                    </Avatar>
+                  )}
+
+                  <div className="space-y-1 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {showUser && user && (
+                        <span className="font-medium">{user.name}</span>
                       )}
+                      <Badge variant={getTypeBadgeVariant(transaction.type)}>
+                        {transaction.type}
+                      </Badge>
+                      <Badge
+                        variant={getStatusBadgeVariant(transaction.status)}
+                      >
+                        {transaction.status}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {transaction.description ||
+                        `Transaction #${transaction.id}`}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(transaction.created_at)}
                     </p>
                   </div>
-                </div>
-                <div className="text-right">
-                  <p
-                    className={`text-sm font-medium ${
-                      transaction.type === TransactionType.DEPOSIT ||
-                      transaction.type === TransactionType.BONUS
-                        ? "text-green-600"
-                        : transaction.type === TransactionType.WITHDRAWAL
-                        ? "text-yellow-600"
-                        : ""
-                    }`}
-                  >
-                    {transaction.type === TransactionType.WITHDRAWAL
-                      ? "- "
-                      : "+ "}
-                    {formatCurrency(transaction.amount, "BDT")}
-                  </p>
-                  <div className="mt-1">
-                    {getStatusBadge(transaction.status)}
+
+                  <div className="text-right">
+                    <p
+                      className={`font-medium ${
+                        transaction.type === TransactionType.WITHDRAWAL
+                          ? "text-red-500"
+                          : "text-green-500"
+                      }`}
+                    >
+                      {transaction.type === TransactionType.WITHDRAWAL
+                        ? "-"
+                        : "+"}
+                      {formatCurrency(transaction.amount, "BDT")}
+                    </p>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <CreditCard className="h-10 w-10 text-muted-foreground mb-2" />
-            <p className="text-sm font-medium">No transactions found</p>
-            <p className="text-xs text-muted-foreground">
-              New transactions will appear here when they are processed
-            </p>
+              );
+            })}
           </div>
         )}
       </CardContent>

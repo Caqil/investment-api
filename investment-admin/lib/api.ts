@@ -1,12 +1,102 @@
 // src/lib/api.ts
-import { ApiResponse } from '../types/api';
-import { AuthResponse, LoginCredentials } from '../types/auth';
+import { User, AuthResponse, LoginCredentials } from '../types/auth';
+import { Transaction } from '../types/transaction';
+import { Plan } from '../types/plan';
+import { Withdrawal } from '../types/withdrawal';
+import { KYCDocument } from '../types/kyc';
+import { Payment } from '../types/payment';
+import { Task } from '../types/task';
+import { Notification } from '../types/notification';
 import { getToken } from './auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
+// Define response types for all endpoints
+export interface ApiResponse<T> {
+  data?: T;
+  error?: string;
+  message?: string;
+}
+
+// Define specific response interfaces
+export interface UsersResponse {
+  users: User[];
+}
+
+export interface UserResponse {
+  user: User;
+}
+
+export interface TransactionsResponse {
+  transactions: Transaction[];
+}
+
+export interface PlansResponse {
+  plans: Plan[];
+}
+
+export interface PlanResponse {
+  plan: Plan;
+  message?: string;
+}
+
+export interface WithdrawalsResponse {
+  withdrawals: Withdrawal[];
+}
+
+export interface WithdrawalResponse {
+  withdrawal: Withdrawal;
+  message?: string;
+}
+
+export interface KYCDocumentsResponse {
+  kyc_documents: KYCDocument[];
+}
+
+export interface KYCDocumentResponse {
+  kyc_document: KYCDocument;
+  message?: string;
+}
+
+export interface PaymentsResponse {
+  payments: Payment[];
+}
+
+export interface PaymentResponse {
+  payment: Payment;
+  message?: string;
+}
+
+export interface TasksResponse {
+  tasks: Task[];
+}
+
+export interface TaskResponse {
+  task: Task;
+  message?: string;
+}
+
+export interface NotificationsResponse {
+  notifications: Notification[];
+  unread_count: number;
+}
+
+export interface MessageResponse {
+  message: string;
+}
+
+export interface StatsResponse {
+  total_users: number;
+  active_users: number;
+  pending_withdrawals: number;
+  pending_kyc: number;
+  recent_users: User[];
+  recent_withdrawals: Withdrawal[];
+  plan_distribution: Array<{name: string; value: number}>;
+}
+
 /**
- * Generic request function with error handling
+ * Generic request function with proper error handling and typing
  */
 async function request<T>(
   endpoint: string,
@@ -15,11 +105,11 @@ async function request<T>(
   try {
     const token = getToken();
     
-    // Create headers object with type assertion
-    const headers = {
+    // Create headers object
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>)
-    } as Record<string, string>;
+      ...((options.headers as Record<string, string>) || {})
+    };
 
     // Add authorization header if token exists
     if (token) {
@@ -38,7 +128,8 @@ async function request<T>(
     });
 
     // For non-json responses
-    if (!response.headers.get('content-type')?.includes('application/json')) {
+    const contentType = response.headers.get('content-type');
+    if (contentType && !contentType.includes('application/json')) {
       if (!response.ok) {
         return {
           error: `Request failed with status ${response.status}`
@@ -47,15 +138,15 @@ async function request<T>(
       return { data: {} as T };
     }
 
-    const data = await response.json();
+    const responseData = await response.json();
 
     if (!response.ok) {
       return {
-        error: data.error || `Request failed with status ${response.status}`
+        error: responseData.error || `Request failed with status ${response.status}`
       };
     }
 
-    return { data: data as T };
+    return { data: responseData };
   } catch (error) {
     console.error('API request error:', error);
     return {
@@ -67,7 +158,7 @@ async function request<T>(
 export const api = {
   // Auth endpoints
   auth: {
-    login: async (credentials: LoginCredentials): Promise<ApiResponse<AuthResponse>> => {
+    login: (credentials: LoginCredentials): Promise<ApiResponse<AuthResponse>> => {
       return request<AuthResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({
@@ -77,53 +168,53 @@ export const api = {
         })
       });
     },
-    validateToken: async (): Promise<ApiResponse<{ valid: boolean }>> => {
+    validateToken: (): Promise<ApiResponse<{ valid: boolean }>> => {
       return request<{ valid: boolean }>('/auth/validate');
     }
   },
   
   // Dashboard data endpoints
   dashboard: {
-    getStats: async (): Promise<ApiResponse<any>> => {
-      return request('/admin/stats');
+    getStats: (): Promise<ApiResponse<StatsResponse>> => {
+      return request<StatsResponse>('/admin/stats');
     }
   },
   
   // User endpoints
   users: {
-    getAll: async () => {
-      return request('/admin/users');
+    getAll: (): Promise<ApiResponse<UsersResponse>> => {
+      return request<UsersResponse>('/admin/users');
     },
-    getById: async (id: number) => {
-      return request(`/admin/users/${id}`);
+    getById: (id: number): Promise<ApiResponse<UserResponse>> => {
+      return request<UserResponse>(`/admin/users/${id}`);
     },
-    block: async (id: number) => {
-      return request(`/admin/users/${id}/block`, { method: 'PUT' });
+    block: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/users/${id}/block`, { method: 'PUT' });
     },
-    unblock: async (id: number) => {
-      return request(`/admin/users/${id}/unblock`, { method: 'PUT' });
+    unblock: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/users/${id}/unblock`, { method: 'PUT' });
     }
   },
   
   // Plan endpoints
   plans: {
-    getAll: async () => {
-      return request('/plans');
+    getAll: (): Promise<ApiResponse<PlansResponse>> => {
+      return request<PlansResponse>('/plans');
     },
-    create: async (planData: any) => {
-      return request('/admin/plans', {
+    create: (planData: Record<string, any>): Promise<ApiResponse<PlanResponse>> => {
+      return request<PlanResponse>('/admin/plans', {
         method: 'POST',
         body: JSON.stringify(planData)
       });
     },
-    update: async (id: number, planData: any) => {
-      return request(`/admin/plans/${id}`, {
+    update: (id: number, planData: Record<string, any>): Promise<ApiResponse<PlanResponse>> => {
+      return request<PlanResponse>(`/admin/plans/${id}`, {
         method: 'PUT',
         body: JSON.stringify(planData)
       });
     },
-    delete: async (id: number) => {
-      return request(`/admin/plans/${id}`, {
+    delete: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/plans/${id}`, {
         method: 'DELETE'
       });
     }
@@ -131,20 +222,20 @@ export const api = {
   
   // Withdrawal endpoints
   withdrawals: {
-    getAll: async () => {
-      return request('/admin/withdrawals');
+    getAll: (): Promise<ApiResponse<WithdrawalsResponse>> => {
+      return request<WithdrawalsResponse>('/admin/withdrawals');
     },
-    getPending: async () => {
-      return request('/admin/withdrawals?status=pending');
+    getPending: (): Promise<ApiResponse<WithdrawalsResponse>> => {
+      return request<WithdrawalsResponse>('/admin/withdrawals?status=pending');
     },
-    approve: async (id: number, adminNote: string) => {
-      return request(`/admin/withdrawals/${id}/approve`, {
+    approve: (id: number, adminNote: string): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/withdrawals/${id}/approve`, {
         method: 'PUT',
         body: JSON.stringify({ admin_note: adminNote })
       });
     },
-    reject: async (id: number, reason: string) => {
-      return request(`/admin/withdrawals/${id}/reject`, {
+    reject: (id: number, reason: string): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/withdrawals/${id}/reject`, {
         method: 'PUT',
         body: JSON.stringify({ reason })
       });
@@ -153,19 +244,19 @@ export const api = {
   
   // KYC endpoints
   kyc: {
-    getAll: async () => {
-      return request('/admin/kyc');
+    getAll: (): Promise<ApiResponse<KYCDocumentsResponse>> => {
+      return request<KYCDocumentsResponse>('/admin/kyc');
     },
-    getPending: async () => {
-      return request('/admin/kyc?status=pending');
+    getPending: (): Promise<ApiResponse<KYCDocumentsResponse>> => {
+      return request<KYCDocumentsResponse>('/admin/kyc?status=pending');
     },
-    approve: async (id: number) => {
-      return request(`/admin/kyc/${id}/approve`, {
+    approve: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/kyc/${id}/approve`, {
         method: 'PUT'
       });
     },
-    reject: async (id: number, reason: string) => {
-      return request(`/admin/kyc/${id}/reject`, {
+    reject: (id: number, reason: string): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/kyc/${id}/reject`, {
         method: 'PUT',
         body: JSON.stringify({ reason })
       });
@@ -174,16 +265,16 @@ export const api = {
   
   // Payment endpoints
   payments: {
-    getPending: async () => {
-      return request('/admin/payments/pending');
+    getPending: (): Promise<ApiResponse<PaymentsResponse>> => {
+      return request<PaymentsResponse>('/admin/payments/pending');
     },
-    approve: async (id: number) => {
-      return request(`/admin/payments/${id}/approve`, {
+    approve: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/payments/${id}/approve`, {
         method: 'PUT'
       });
     },
-    reject: async (id: number, reason: string) => {
-      return request(`/admin/payments/${id}/reject`, {
+    reject: (id: number, reason: string): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/payments/${id}/reject`, {
         method: 'PUT',
         body: JSON.stringify({ reason })
       });
@@ -192,23 +283,23 @@ export const api = {
   
   // Task endpoints
   tasks: {
-    getAll: async () => {
-      return request('/tasks');
+    getAll: (): Promise<ApiResponse<TasksResponse>> => {
+      return request<TasksResponse>('/tasks');
     },
-    create: async (taskData: any) => {
-      return request('/admin/tasks', {
+    create: (taskData: Record<string, any>): Promise<ApiResponse<TaskResponse>> => {
+      return request<TaskResponse>('/admin/tasks', {
         method: 'POST',
         body: JSON.stringify(taskData)
       });
     },
-    update: async (id: number, taskData: any) => {
-      return request(`/admin/tasks/${id}`, {
+    update: (id: number, taskData: Record<string, any>): Promise<ApiResponse<TaskResponse>> => {
+      return request<TaskResponse>(`/admin/tasks/${id}`, {
         method: 'PUT',
         body: JSON.stringify(taskData)
       });
     },
-    delete: async (id: number) => {
-      return request(`/admin/tasks/${id}`, {
+    delete: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/tasks/${id}`, {
         method: 'DELETE'
       });
     }
@@ -216,21 +307,18 @@ export const api = {
   
   // Transaction endpoints
   transactions: {
-    getAll: async () => {
-      return request('/admin/transactions');
-    },
-    getByUserId: async (userId: number) => {
-      return request(`/admin/users/${userId}/transactions`);
-    },
-    getRecentTransactions: async (limit: number = 5) => {
-      return request(`/admin/transactions/recent?limit=${limit}`);
+    getAll: (): Promise<ApiResponse<TransactionsResponse>> => {
+      return request<TransactionsResponse>('/admin/transactions');
     }
   },
   
   // Notification endpoints
   notifications: {
-    send: async (title: string, message: string) => {
-      return request('/admin/notifications', {
+    getAll: (): Promise<ApiResponse<NotificationsResponse>> => {
+      return request<NotificationsResponse>('/admin/notifications');
+    },
+    send: (title: string, message: string): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>('/admin/notifications', {
         method: 'POST',
         body: JSON.stringify({ title, message })
       });
