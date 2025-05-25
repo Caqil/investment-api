@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 
+	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/Caqil/investment-api/internal/model"
 	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/gin-gonic/gin"
@@ -15,6 +16,9 @@ type DashboardController struct {
 	withdrawalRepo  *repository.WithdrawalRepository
 	kycRepo         *repository.KYCRepository
 }
+
+// Make sure DashboardController implements the DashboardInterface
+var _ interfaces.DashboardInterface = (*DashboardController)(nil)
 
 // NewDashboardController creates a new dashboard controller
 func NewDashboardController(
@@ -40,9 +44,7 @@ func (c *DashboardController) Dashboard(ctx *gin.Context) {
 	var totalDeposits float64 = 0
 	depositTransactions, _ := c.transactionRepo.FindByTypeAndDate(
 		model.TransactionTypeDeposit,
-		// Start from a date far in the past
-		// Get the current time
-		// This is simplified for the example
+		// This is simplified for the example - would need proper date handling
 		nil, // Replace with appropriate date range
 		nil, // Replace with appropriate date range
 	)

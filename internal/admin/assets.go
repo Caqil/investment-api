@@ -9,25 +9,22 @@ import (
 
 // AssetManager manages assets for the admin interface
 type AssetManager struct {
-	AssetFS *assetfs.AssetFS
+	AssetFS assetfs.Interface
 }
 
 // NewAssetManager creates a new asset manager
 func NewAssetManager() *AssetManager {
 	// Create asset fs
-	assetFS := &assetfs.AssetFS{
-		NameSpace:       "admin",
-		AssetFileSystem: assetfs.LocalFileSystem{},
-	}
+	fs := assetfs.AssetFS().NameSpace("admin")
 
 	// Register admin assets
-	assetFS.RegisterPath(filepath.Join("public", "admin"))
+	fs.RegisterPath(filepath.Join("public", "admin"))
 
 	// Ensure admin assets directory exists
 	ensureAdminAssetsDirectory()
 
 	return &AssetManager{
-		AssetFS: assetFS,
+		AssetFS: fs,
 	}
 }
 

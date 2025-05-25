@@ -3,6 +3,7 @@ package admin
 import (
 	"net/http"
 
+	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/Caqil/investment-api/pkg/utils"
 	"github.com/gin-contrib/sessions"
@@ -14,6 +15,9 @@ type AdminAuthController struct {
 	userRepo   *repository.UserRepository
 	jwtManager *utils.JWTManager
 }
+
+// Make sure AdminAuthController implements the AdminAuthInterface
+var _ interfaces.AdminAuthInterface = (*AdminAuthController)(nil)
 
 // NewAdminAuthController creates a new admin auth controller
 func NewAdminAuthController(userRepo *repository.UserRepository, jwtManager *utils.JWTManager) *AdminAuthController {

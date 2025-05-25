@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/Caqil/investment-api/config"
+	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/Caqil/investment-api/pkg/utils"
 )
@@ -25,20 +26,20 @@ func NewFactory(db *sql.DB, cfg *config.Config, jwtManager *utils.JWTManager) *F
 }
 
 // CreateAdminSetup creates an admin setup
-func (f *Factory) CreateAdminSetup() *AdminSetup {
+func (f *Factory) CreateAdminSetup() interfaces.AdminInterface {
 	adminSetup := NewAdminSetup(f.DB, f.Config)
 	adminSetup.SetupAuth()
 	return adminSetup
 }
 
 // CreateAdminAuthController creates an admin auth controller
-func (f *Factory) CreateAdminAuthController() *AdminAuthController {
+func (f *Factory) CreateAdminAuthController() interfaces.AdminAuthInterface {
 	userRepo := repository.NewUserRepository(f.DB)
 	return NewAdminAuthController(userRepo, f.JWTManager)
 }
 
 // CreateDashboardController creates a dashboard controller
-func (f *Factory) CreateDashboardController() *DashboardController {
+func (f *Factory) CreateDashboardController() interfaces.DashboardInterface {
 	userRepo := repository.NewUserRepository(f.DB)
 	transactionRepo := repository.NewTransactionRepository(f.DB)
 	withdrawalRepo := repository.NewWithdrawalRepository(f.DB)

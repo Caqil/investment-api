@@ -239,32 +239,25 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.POST("/notifications", adminController.SendNotification)
 	}
 
-	// Initialize and mount admin interface
+	// Initialize admin components with factory
 	adminFactory := admin.NewFactory(a.db, a.config, a.jwtService.GetJWTManager())
 
-	// Create admin setup
+	// Create admin components
 	adminSetup := adminFactory.CreateAdminSetup()
-
-	// Create admin controllers
 	adminAuthController := adminFactory.CreateAdminAuthController()
 	dashboardController := adminFactory.CreateDashboardController()
 
-	// Set up admin web interface routes
-	adminRoutes := r.Group("/admin")
+	// Create admin service
+	adminService := service.NewAdminService(
+		a.db,
+		a.config,
+		adminSetup,
+		adminAuthController,
+		dashboardController,
+	)
 
-	// Login routes (no auth required)
-	adminRoutes.GET("/login", adminAuthController.LoginForm)
-	adminRoutes.POST("/login", adminAuthController.Login)
-
-	// Protected admin routes
-	adminRoutes.Use(adminAuthController.RequireAdmin())
-	{
-		adminRoutes.GET("/", dashboardController.Dashboard)
-		adminRoutes.GET("/logout", adminAuthController.Logout)
-
-		// Mount Qor Admin
-		adminSetup.MountTo("/admin", r)
-	}
+	// Set up admin routes
+	adminService.SetupAdminRoutes(r)
 
 	return r
 }

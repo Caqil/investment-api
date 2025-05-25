@@ -10,6 +10,8 @@ require (
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang-jwt/jwt/v4 v4.5.0
 	github.com/joho/godotenv v1.5.1
+	github.com/qor/assetfs v0.0.0-20170713023933-ff57fdc13a14
+	github.com/qor/qor v1.3.0
 	golang.org/x/crypto v0.37.0
 )
 
@@ -17,7 +19,6 @@ require (
 	github.com/asaskevich/govalidator v0.0.0-20200428143746-21a406dcc535 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
-	github.com/chris-ramon/douceur v0.2.0 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
 	github.com/gorilla/context v1.1.2 // indirect
 	github.com/gorilla/css v1.0.0 // indirect
@@ -28,9 +29,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.21 // indirect
-	github.com/qor/assetfs v0.0.0-20170713023933-ff57fdc13a14 // indirect
 	github.com/qor/middlewares v0.0.0-20170822143614-781378b69454 // indirect
-	github.com/qor/qor v1.3.0 // indirect
 	github.com/qor/responder v0.0.0-20171031032654-b6def473574f // indirect
 	github.com/qor/roles v0.0.0-20171127035124-d6375609fe3e // indirect
 	github.com/qor/session v0.0.0-20170907035918-8206b0adab70 // indirect
@@ -41,8 +40,6 @@ require (
 
 require (
 	github.com/bytedance/sonic v1.13.2 // indirect
-	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
-	github.com/chenzhuoyu/iasm v0.9.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sessions v1.0.4
 	github.com/gin-contrib/sse v1.0.0 // indirect
@@ -67,4 +64,6 @@ require (
 	golang.org/x/text v0.24.0 // indirect
 	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	gorm.io/driver/mysql v1.5.7
+	gorm.io/gorm v1.30.0
 )

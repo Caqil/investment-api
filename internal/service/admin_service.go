@@ -4,9 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/Caqil/investment-api/config"
-	"github.com/Caqil/investment-api/internal/admin"
-	"github.com/Caqil/investment-api/internal/repository"
-	"github.com/Caqil/investment-api/pkg/utils"
+	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
@@ -16,31 +14,19 @@ import (
 type AdminService struct {
 	DB                  *sql.DB
 	Config              *config.Config
-	AdminSetup          *admin.AdminSetup
-	AuthController      *admin.AdminAuthController
-	DashboardController *admin.DashboardController
+	AdminSetup          interfaces.AdminInterface
+	AuthController      interfaces.AdminAuthInterface
+	DashboardController interfaces.DashboardInterface
 }
 
 // NewAdminService creates a new admin service
-func NewAdminService(db *sql.DB, cfg *config.Config, jwtManager *utils.JWTManager) *AdminService {
-	// Create repositories
-	userRepo := repository.NewUserRepository(db)
-	transactionRepo := repository.NewTransactionRepository(db)
-	withdrawalRepo := repository.NewWithdrawalRepository(db)
-	kycRepo := repository.NewKYCRepository(db)
-
-	// Create admin setup
-	adminSetup := admin.NewAdminSetup(db, cfg)
-
-	// Create controllers
-	authController := admin.NewAdminAuthController(userRepo, jwtManager)
-	dashboardController := admin.NewDashboardController(
-		userRepo,
-		transactionRepo,
-		withdrawalRepo,
-		kycRepo,
-	)
-
+func NewAdminService(
+	db *sql.DB,
+	cfg *config.Config,
+	adminSetup interfaces.AdminInterface,
+	authController interfaces.AdminAuthInterface,
+	dashboardController interfaces.DashboardInterface,
+) *AdminService {
 	return &AdminService{
 		DB:                  db,
 		Config:              cfg,

@@ -6,40 +6,59 @@ import (
 	"net/http"
 
 	"github.com/Caqil/investment-api/config"
+	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/Caqil/investment-api/internal/model"
 	"github.com/Caqil/investment-api/internal/repository"
-	"github.com/Caqil/investment-api/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/qor/admin"
 	"github.com/qor/assetfs"
 	"github.com/qor/qor"
 	"github.com/qor/qor/resource"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 // AdminSetup represents the admin interface setup
 type AdminSetup struct {
-	Admin      *admin.Admin
-	DB         *sql.DB
-	Config     *config.Config
-	UserRepo   *repository.UserRepository
-	JWTService *service.JWTService
+	Admin    *admin.Admin
+	DB       *sql.DB
+	GormDB   *gorm.DB
+	Config   *config.Config
+	UserRepo *repository.UserRepository
 }
+
+// Make sure AdminSetup implements the AdminInterface
+var _ interfaces.AdminInterface = (*AdminSetup)(nil)
 
 // NewAdminSetup creates a new admin setup
 func NewAdminSetup(db *sql.DB, cfg *config.Config) *AdminSetup {
+	// Convert sql.DB to gorm.DB
+	// Get the database DSN from db connection
+	// This is an example DSN - you may need to construct it from your config
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		cfg.Database.Username,
+		cfg.Database.Password,
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.Name,
+	)
+
+	gormDB, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		panic("Failed to connect to database with GORM: " + err.Error())
+	}
+
 	// Create a new admin instance
-	Admin := admin.New(&qor.Config{
-		DB: db,
-		AssetFS: assetfs.AssetFS{
-			AssetFileSystem: assetfs.LocalFileSystem{},
-			NameSpace:       "admin",
-		},
+	Admin := admin.New(&admin.AdminConfig{
+		DB:      gormDB,
+		AssetFS: assetfs.AssetFS().NameSpace("admin"),
 	})
 
 	// Create admin setup
 	adminSetup := &AdminSetup{
 		Admin:    Admin,
 		DB:       db,
+		GormDB:   gormDB,
 		Config:   cfg,
 		UserRepo: repository.NewUserRepository(db),
 	}
