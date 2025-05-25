@@ -1,10 +1,9 @@
+// File: cmd/admin/main.go - This is your entry point for the admin dashboard
 package main
 
 import (
 	"log"
 	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/Caqil/investment-api/config"
 	"github.com/Caqil/investment-api/internal/admin"
@@ -29,50 +28,27 @@ func main() {
 	}
 	defer db.Close()
 
-	// Initialize GORM DB
-	gormDB, err := admin.GORMAdapter(db, "mysql")
-	if err != nil {
-		log.Fatalf("Failed to initialize GORM: %v", err)
-	}
-
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	transactionRepo := repository.NewTransactionRepository(db)
 	withdrawalRepo := repository.NewWithdrawalRepository(db)
 	kycRepo := repository.NewKYCRepository(db)
+	planRepo := repository.NewPlanRepository(db)
 
-	// Initialize admin controller
-	adminController := admin.NewAdminController(
-		gormDB,
-		userRepo,
-		transactionRepo,
-		withdrawalRepo,
-		kycRepo,
-	)
-
-	// Set up admin
-	adminConfig := &admin.AdminConfig{
-		DB:             gormDB,
-		Port:           "9000", // Use a different port than your API
-		UserRepository: userRepo,
-		JWTSecret:      cfg.JWT.Secret,
+	// Initialize admin application
+	adminApp, err := admin.NewAdminApp(db, userRepo, transactionRepo, withdrawalRepo, kycRepo, planRepo, cfg)
+	if err != nil {
+		log.Fatalf("Failed to initialize admin app: %v", err)
 	}
 
-	// Initialize admin
-	adminInstance := admin.SetupAdmin(adminConfig)
+	// Start admin server
+	port := os.Getenv("ADMIN_PORT")
+	if port == "" {
+		port = "9000"
+	}
 
-	// Register custom routes
-	adminController.RegisterRoutes(adminInstance)
-
-	// Start admin server in a goroutine
-	go func() {
-		log.Printf("Admin interface starting on port %s", adminConfig.Port)
-		admin.RunAdmin(adminInstance, adminConfig.Port)
-	}()
-
-	// Wait for interrupt signal to gracefully shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("Admin server is shutting down...")
+	log.Printf("Starting admin server on port %s", port)
+	if err := adminApp.Run(port); err != nil {
+		log.Fatalf("Failed to start admin server: %v", err)
+	}
 }

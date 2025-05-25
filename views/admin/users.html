@@ -1,0 +1,102 @@
+<!-- File: views/admin/users.html -->
+{{ define "content" }}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Users List</span>
+        <div>
+            <form class="form-inline" method="get">
+                <input type="text" name="search" class="form-control mr-2" placeholder="Search users...">
+                <button type="submit" class="btn btn-primary">Search</button>
+            </form>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Balance</th>
+                        <th>KYC</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .users }}
+                    <tr>
+                        <td>{{ .ID }}</td>
+                        <td>{{ .Name }} {{ if .IsKYCVerified }}<span class="badge badge-primary">Verified</span>{{ end }}</td>
+                        <td>{{ .Email }}</td>
+                        <td>{{ .Phone }}</td>
+                        <td>{{ .Balance }} BDT</td>
+                        <td>
+                            {{ if .IsKYCVerified }}
+                            <span class="badge badge-success">Verified</span>
+                            {{ else }}
+                            <span class="badge badge-secondary">Not Verified</span>
+                            {{ end }}
+                        </td>
+                        <td>
+                            {{ if .IsBlocked }}
+                            <span class="badge badge-danger">Blocked</span>
+                            {{ else }}
+                            <span class="badge badge-success">Active</span>
+                            {{ end }}
+                        </td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <a href="/admin/users/{{ .ID }}" class="btn btn-info">View</a>
+                                {{ if .IsBlocked }}
+                                <form action="/admin/users/{{ .ID }}/unblock" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-success">Unblock</button>
+                                </form>
+                                {{ else }}
+                                <form action="/admin/users/{{ .ID }}/block" method="post" class="d-inline">
+                                    <button type="submit" class="btn btn-danger">Block</button>
+                                </form>
+                                {{ end }}
+                            </div>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {{ if gt .pagination.current 1 }}
+                <li class="page-item">
+                    <a class="page-link" href="/admin/users?page={{ subtract .pagination.current 1 }}">Previous</a>
+                </li>
+                {{ else }}
+                <li class="page-item disabled">
+                    <a class="page-link" href="#">Previous</a>
+                </li>
+                {{ end }}
+                
+                {{ range $i := seq 1 .pagination.total }}
+                <li class="page-item {{ if eq $i $.pagination.current }}active{{ end }}">
+                    <a class="page-link" href="/admin/users?page={{ $i }}">{{ $i }}</a>
+                </li>
+                {{ end }}
+                
+                {{ if lt .pagination.current .pagination.total }}
+                <li class="page-item">
+                    <a class="page-link" href="/admin/users?page={{ add .pagination.current 1 }}">Next</a>
+                </li>
+                {{ else }}
+                <li class="page-item disabled">
+                    <a class="page-link" href="#">Next</a>
+                </li>
+                {{ end }}
+            </ul>
+        </nav>
+    </div>
+</div>
+{{ end }}

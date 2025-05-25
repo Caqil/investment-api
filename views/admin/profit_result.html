@@ -1,0 +1,32 @@
+<!-- File: views/admin/profit_result.html -->
+{{ define "content" }}
+<div class="alert alert-success" role="alert">
+    <h4 class="alert-heading">Profit Calculation Complete!</h4>
+    <p>The daily profit calculation has been successfully completed.</p>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header">
+        <h5>Calculation Results</h5>
+    </div>
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-sm-4">Total Users:</dt>
+            <dd class="col-sm-8">{{ .stats.totalUsers }}</dd>
+            
+            <dt class="col-sm-4">Processed Users:</dt>
+            <dd class="col-sm-8">{{ .stats.processedUsers }}</dd>
+            
+            <dt class="col-sm-4">Total Profit Distributed:</dt>
+            <dd class="col-sm-8">{{ .stats.totalProfit }} BDT</dd>
+            
+            <dt class="col-sm-4">Processing Time:</dt>
+            <dd class="col-sm-8">{{ .stats.duration }}</dd>
+        </dl>
+    </div>
+</div>
+
+<a href="/admin" class="btn btn-primary">
+    <span data-feather="arrow-left"></span> Back to Dashboard
+</a>
+{{ end }}

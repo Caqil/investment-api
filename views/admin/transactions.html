@@ -1,0 +1,101 @@
+<!-- File: views/admin/transactions.html -->
+{{ define "content" }}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Transactions</span>
+        <div>
+            <div class="btn-group" role="group">
+                <a href="/admin/transactions" class="btn btn-secondary {{ if eq .typeFilter "" }}active{{ end }}">All</a>
+                <a href="/admin/transactions?type=deposit" class="btn btn-primary {{ if eq .typeFilter "deposit" }}active{{ end }}">Deposits</a>
+                <a href="/admin/transactions?type=withdrawal" class="btn btn-warning {{ if eq .typeFilter "withdrawal" }}active{{ end }}">Withdrawals</a>
+                <a href="/admin/transactions?type=bonus" class="btn btn-success {{ if eq .typeFilter "bonus" }}active{{ end }}">Bonuses</a>
+                <a href="/admin/transactions?type=referral_bonus" class="btn btn-info {{ if eq .typeFilter "referral_bonus" }}active{{ end }}">Referrals</a>
+                <a href="/admin/transactions?type=plan_purchase" class="btn btn-dark {{ if eq .typeFilter "plan_purchase" }}active{{ end }}">Plan Purchases</a>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User ID</th>
+                        <th>Amount</th>
+                        <th>Type</th>
+                        <th>Status</th>
+                        <th>Description</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .transactions }}
+                    <tr>
+                        <td>{{ .ID }}</td>
+                        <td>{{ .UserID }}</td>
+                        <td>{{ .Amount }} BDT</td>
+                        <td>
+                            {{ if eq .Type "deposit" }}
+                            <span class="badge badge-primary">Deposit</span>
+                            {{ else if eq .Type "withdrawal" }}
+                            <span class="badge badge-warning">Withdrawal</span>
+                            {{ else if eq .Type "bonus" }}
+                            <span class="badge badge-success">Bonus</span>
+                            {{ else if eq .Type "referral_bonus" }}
+                            <span class="badge badge-info">Referral Bonus</span>
+                            {{ else if eq .Type "plan_purchase" }}
+                            <span class="badge badge-dark">Plan Purchase</span>
+                            {{ else if eq .Type "referral_profit" }}
+                            <span class="badge badge-secondary">Referral Profit</span>
+                            {{ end }}
+                        </td>
+                        <td>
+                            {{ if eq .Status "pending" }}
+                            <span class="badge badge-warning">Pending</span>
+                            {{ else if eq .Status "completed" }}
+                            <span class="badge badge-success">Completed</span>
+                            {{ else if eq .Status "rejected" }}
+                            <span class="badge badge-danger">Rejected</span>
+                            {{ end }}
+                        </td>
+                        <td>{{ .Description }}</td>
+                        <td>{{ .CreatedAt.Format "Jan 02, 2006 15:04" }}</td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {{ if gt .pagination.current 1 }}
+                <li class="page-item">
+                    <a class="page-link" href="/admin/transactions?page={{ subtract .pagination.current 1 }}&type={{ .typeFilter }}">Previous</a>
+                </li>
+                {{ else }}
+                <li class="page-item disabled">
+                    <a class="page-link" href="#">Previous</a>
+                </li>
+                {{ end }}
+                
+                {{ range $i := seq 1 .pagination.total }}
+                <li class="page-item {{ if eq $i $.pagination.current }}active{{ end }}">
+                    <a class="page-link" href="/admin/transactions?page={{ $i }}&type={{ $.typeFilter }}">{{ $i }}</a>
+                </li>
+                {{ end }}
+                
+                {{ if lt .pagination.current .pagination.total }}
+                <li class="page-item">
+                    <a class="page-link" href="/admin/transactions?page={{ add .pagination.current 1 }}&type={{ .typeFilter }}">Next</a>
+                </li>
+                {{ else }}
+                <li class="page-item disabled">
+                    <a class="page-link" href="#">Next</a>
+                </li>
+                {{ end }}
+            </ul>
+        </nav>
+    </div>
+</div>
+{{ end }}

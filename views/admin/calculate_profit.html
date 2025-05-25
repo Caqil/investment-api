@@ -1,0 +1,17 @@
+<!-- File: views/admin/calculate_profit.html -->
+{{ define "content" }}
+<div class="card mb-4">
+    <div class="card-header">
+        <h5>Calculate Daily Profit</h5>
+    </div>
+    <div class="card-body">
+        <p>This will calculate and distribute the daily 5% profit bonus to all users based on their current balance.</p>
+        <p>It will also calculate and distribute the 10% referral profit bonus to users who have referred others.</p>
+        <p class="text-danger">This action cannot be undone. Please make sure you want to proceed.</p>
+        
+        <form action="/admin/system/calculate-profit" method="post">
+            <button type="submit" class="btn btn-primary">Calculate and Distribute Profit</button>
+        </form>
+    </div>
+</div>
+{{ end }}

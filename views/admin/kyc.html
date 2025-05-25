@@ -1,0 +1,222 @@
+<!-- File: views/admin/kyc.html -->
+{{ define "content" }}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>KYC Documents</span>
+        <div>
+            <div class="btn-group" role="group">
+                <a href="/admin/kyc" class="btn btn-secondary {{ if eq .statusFilter "" }}active{{ end }}">All</a>
+                <a href="/admin/kyc?status=pending" class="btn btn-warning {{ if eq .statusFilter "pending" }}active{{ end }}">
+                    Pending <span class="badge badge-light">{{ .pendingCount }}</span>
+                </a>
+                <a href="/admin/kyc?status=approved" class="btn btn-success {{ if eq .statusFilter "approved" }}active{{ end }}">Approved</a>
+                <a href="/admin/kyc?status=rejected" class="btn btn-danger {{ if eq .statusFilter "rejected" }}active{{ end }}">Rejected</a>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User ID</th>
+                        <th>Document Type</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{ range .kycs }}
+                    <tr>
+                        <td>{{ .ID }}</td>
+                        <td>{{ .UserID }}</td>
+                        <td>{{ .DocumentType }}</td>
+                        <td>
+                            {{ if eq .Status "pending" }}
+                            <span class="badge badge-warning">Pending</span>
+                            {{ else if eq .Status "approved" }}
+                            <span class="badge badge-success">Approved</span>
+                            {{ else if eq .Status "rejected" }}
+                            <span class="badge badge-danger">Rejected</span>
+                            {{ end }}
+                        </td>
+                        <td>{{ .CreatedAt.Format "Jan 02, 2006 15:04" }}</td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button type="button" class="btn btn-info" data-toggle="modal" data-target="#viewModal{{ .ID }}">
+                                    View
+                                </button>
+                                {{ if eq .Status "pending" }}
+                                <button type="button" class="btn btn-success" data-toggle="modal" data-target="#approveModal{{ .ID }}">
+                                    Approve
+                                </button>
+                                <button type="button" class="btn btn-danger" data-toggle="modal" data-target="#rejectModal{{ .ID }}">
+                                    Reject
+                                </button>
+                                {{ end }}
+                            </div>
+                        </td>
+                    </tr>
+                    {{ end }}
+                </tbody>
+            </table>
+        </div>
+        
+        <!-- Pagination -->
+        <nav aria-label="Page navigation">
+            <ul class="pagination justify-content-center">
+                {{ if gt .pagination.current 1 }}
+                <li class="page-item">
+                    <a class="page-link" href="/admin/kyc?page={{ subtract .pagination.current 1 }}&status={{ .statusFilter }}">Previous</a>
+                </li>
+                {{ else }}
+                <li class="page-item disabled">
+                    <a class="page-link" href="#">Previous</a>
+                </li>
+                {{ end }}
+                
+                {{ range $i := seq 1 .pagination.total }}
+                <li class="page-item {{ if eq $i $.pagination.current }}active{{ end }}">
+                    <a class="page-link" href="/admin/kyc?page={{ $i }}&status={{ $.statusFilter }}">{{ $i }}</a>
+                </li>
+                {{ end }}
+                
+                {{ if lt .pagination.current .pagination.total }}
+                <li class="page-item">
+                    <a class="page-link" href="/admin/kyc?page={{ add .pagination.current 1 }}&status={{ .statusFilter }}">Next</a>
+                </li>
+                {{ else }}
+                <li class="page-item disabled">
+                    <a class="page-link" href="#">Next</a>
+                </li>
+                {{ end }}
+            </ul>
+        </nav>
+    </div>
+</div>
+
+<!-- Modals for each KYC document -->
+{{ range .kycs }}
+<!-- View Modal for KYC {{ .ID }} -->
+<div class="modal fade" id="viewModal{{ .ID }}" tabindex="-1" aria-labelledby="viewModalLabel{{ .ID }}" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewModalLabel{{ .ID }}">View KYC Document #{{ .ID }}</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <dl class="row">
+                    <dt class="col-sm-4">User ID:</dt>
+                    <dd class="col-sm-8">{{ .UserID }}</dd>
+                    <dt class="col-sm-4">Document Type:</dt>
+                    <dd class="col-sm-8">{{ .DocumentType }}</dd>
+                    <dt class="col-sm-4">Status:</dt>
+                    <dd class="col-sm-8">
+                        {{ if eq .Status "pending" }}
+                        <span class="badge badge-warning">Pending</span>
+                        {{ else if eq .Status "approved" }}
+                        <span class="badge badge-success">Approved</span>
+                        {{ else if eq .Status "rejected" }}
+                        <span class="badge badge-danger">Rejected</span>
+                        {{ end }}
+                    </dd>
+                    {{ if .AdminNote }}
+                    <dt class="col-sm-4">Admin Note:</dt>
+                    <dd class="col-sm-8">{{ .AdminNote }}</dd>
+                    {{ end }}
+                </dl>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header">Document Front</div>
+                            <div class="card-body text-center">
+                                <img src="{{ .DocumentFrontURL }}" class="img-fluid" alt="Document Front">
+                            </div>
+                        </div>
+                    </div>
+                    {{ if .DocumentBackURL }}
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header">Document Back</div>
+                            <div class="card-body text-center">
+                                <img src="{{ .DocumentBackURL }}" class="img-fluid" alt="Document Back">
+                            </div>
+                        </div>
+                    </div>
+                    {{ end }}
+                </div>
+                
+                <div class="card mb-3">
+                    <div class="card-header">Selfie</div>
+                    <div class="card-body text-center">
+                        <img src="{{ .SelfieURL }}" class="img-fluid" alt="Selfie">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ if eq .Status "pending" }}
+<!-- Approve Modal for KYC {{ .ID }} -->
+<div class="modal fade" id="approveModal{{ .ID }}" tabindex="-1" aria-labelledby="approveModalLabel{{ .ID }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/kyc/{{ .ID }}/approve" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="approveModalLabel{{ .ID }}">Approve KYC Document #{{ .ID }}</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to approve this KYC document?</p>
+                    <p>This will mark the user as KYC verified.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success">Approve KYC</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Reject Modal for KYC {{ .ID }} -->
+<div class="modal fade" id="rejectModal{{ .ID }}" tabindex="-1" aria-labelledby="rejectModalLabel{{ .ID }}" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form action="/admin/kyc/{{ .ID }}/reject" method="post">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rejectModalLabel{{ .ID }}">Reject KYC Document #{{ .ID }}</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to reject this KYC document?</p>
+                    <div class="form-group">
+                        <label for="reason">Reason (required):</label>
+                        <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Reject KYC</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{{ end }}
+{{ end }}
+{{ end }}

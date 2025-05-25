@@ -3,45 +3,30 @@ package admin
 import (
 	"database/sql"
 	"fmt"
+	"os"
 
-	"github.com/Caqil/investment-api/internal/model"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 )
 
 // GORMAdapter converts a standard database/sql.DB to a GORM DB
 func GORMAdapter(db *sql.DB, dbType string) (*gorm.DB, error) {
-	// Create new GORM connection using the existing *sql.DB
-	gormDB, err := gorm.Open(dbType, db)
+	// Create a DSN from the existing connection
+	connStr := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&loc=Local",
+		os.Getenv("DB_USERNAME"),
+		os.Getenv("DB_PASSWORD"),
+		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
+		os.Getenv("DB_NAME"))
+
+	// Open a new GORM connection
+	gormDB, err := gorm.Open(dbType, connStr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize GORM: %v", err)
 	}
 
-	// Auto-migrate the schema
-	if err := autoMigrateSchema(gormDB); err != nil {
-		return nil, fmt.Errorf("failed to auto-migrate schema: %v", err)
-	}
+	// Enable logging for debugging
+	gormDB.LogMode(true)
 
 	return gormDB, nil
-}
-
-// autoMigrateSchema ensures all models are migrated in GORM
-func autoMigrateSchema(db *gorm.DB) error {
-	// Register the models for GORM
-	db.AutoMigrate(
-		&model.User{},
-		&model.Plan{},
-		&model.Transaction{},
-		&model.Payment{},
-		&model.Withdrawal{},
-		&model.Task{},
-		&model.UserTask{},
-		&model.KYCDocument{},
-		&model.Device{},
-		&model.Notification{},
-		&model.News{},
-		&model.FAQ{},
-	)
-
-	return nil
 }
