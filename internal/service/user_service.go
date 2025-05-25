@@ -5,12 +5,14 @@ import (
 
 	"github.com/Caqil/investment-api/internal/model"
 	"github.com/Caqil/investment-api/internal/repository"
+	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/Caqil/investment-api/pkg/utils"
 )
 
 type UserService struct {
 	userRepo   *repository.UserRepository
 	deviceRepo *repository.DeviceRepository
+	mongoConn  *database.MongoDBConnection // Add this field
 }
 
 func NewUserService(
@@ -148,7 +150,7 @@ func (s *UserService) AssignPlan(userID, planID int64) error {
 	}
 
 	// Get plan
-	planRepo := repository.NewPlanRepository(s.userRepo.GetDB())
+	planRepo := repository.NewPlanRepository(s.mongoConn)
 	plan, err := planRepo.FindByID(planID)
 	if err != nil {
 		return err
@@ -179,7 +181,7 @@ func (s *UserService) PurchasePlan(userID, planID int64, price float64) error {
 	}
 
 	// Get plan
-	planRepo := repository.NewPlanRepository(s.userRepo.GetDB())
+	planRepo := repository.NewPlanRepository(s.mongoConn) // Use mongoConn instead of userRepo.GetDB()
 	plan, err := planRepo.FindByID(planID)
 	if err != nil {
 		return err
@@ -189,7 +191,7 @@ func (s *UserService) PurchasePlan(userID, planID int64, price float64) error {
 	}
 
 	// Create transaction
-	transactionRepo := repository.NewTransactionRepository(s.userRepo.GetDB())
+	transactionRepo := repository.NewTransactionRepository(s.mongoConn) // Use mongoConn instead of userRepo.GetDB()
 	transaction := &model.Transaction{
 		UserID:      userID,
 		Amount:      price,

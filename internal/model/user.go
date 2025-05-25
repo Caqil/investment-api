@@ -6,6 +6,11 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// Add this method to your model/user.go file
+func (u *User) DisplayName() string {
+	return u.Name
+}
+
 type User struct {
 	ID               int64              `json:"id" bson:"id"`
 	ObjectID         primitive.ObjectID `json:"-" bson:"_id,omitempty"`

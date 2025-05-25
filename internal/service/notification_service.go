@@ -6,11 +6,13 @@ import (
 
 	"github.com/Caqil/investment-api/internal/model"
 	"github.com/Caqil/investment-api/internal/repository"
+	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/Caqil/investment-api/pkg/utils"
 )
 
 type NotificationService struct {
 	notificationRepo *repository.NotificationRepository
+	mongoConn        *database.MongoDBConnection // Add this field
 	emailService     *utils.EmailService
 }
 
@@ -53,7 +55,7 @@ func (s *NotificationService) CreateWithdrawalApprovalNotification(userID, withd
 
 	// Also send an email
 	// Get user email from repository
-	userRepo := repository.NewUserRepository(s.notificationRepo.GetDB())
+	userRepo := repository.NewUserRepository(s.mongoConn)
 	user, err := userRepo.FindByID(userID)
 	if err != nil {
 		return err
@@ -77,7 +79,7 @@ func (s *NotificationService) CreateWithdrawalRejectionNotification(userID, with
 
 	// Also send an email
 	// Get user email from repository
-	userRepo := repository.NewUserRepository(s.notificationRepo.GetDB())
+	userRepo := repository.NewUserRepository(s.mongoConn)
 	user, err := userRepo.FindByID(userID)
 	if err != nil {
 		return err
@@ -166,7 +168,13 @@ func (s *NotificationService) GetUnreadNotificationsByUserID(userID int64, limit
 
 // GetUnreadNotificationCountByUserID gets the count of unread notifications for a user
 func (s *NotificationService) GetUnreadNotificationCountByUserID(userID int64) (int, error) {
-	return s.notificationRepo.CountUnreadByUserID(userID)
+	count, err := s.notificationRepo.CountUnreadByUserID(userID)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert int64 to int
+	return int(count), nil
 }
 
 // MarkNotificationAsRead marks a notification as read

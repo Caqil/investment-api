@@ -168,5 +168,11 @@ func (s *KYCService) GetAllKYCDocuments(limit, offset int) ([]*model.KYCDocument
 
 // CountPendingKYCDocuments gets the count of pending KYC documents
 func (s *KYCService) CountPendingKYCDocuments() (int, error) {
-	return s.kycRepo.CountByStatus(model.KYCStatusPending)
+	count, err := s.kycRepo.CountByStatus(model.KYCStatusPending)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert int64 to int
+	return int(count), nil
 }

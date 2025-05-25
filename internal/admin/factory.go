@@ -1,11 +1,14 @@
 package admin
 
 import (
+	"net/http"
+
 	"github.com/Caqil/investment-api/config"
 	"github.com/Caqil/investment-api/internal/interfaces"
 	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/Caqil/investment-api/pkg/utils"
+	"github.com/gin-gonic/gin"
 )
 
 // Factory creates admin components
@@ -26,9 +29,8 @@ func NewFactory(mongoConn *database.MongoDBConnection, cfg *config.Config, jwtMa
 
 // CreateAdminSetup creates an admin setup
 func (f *Factory) CreateAdminSetup() interfaces.AdminInterface {
-	adminSetup := NewAdminSetup(f.MongoConn, f.Config)
-	adminSetup.SetupAuth()
-	return adminSetup
+	// Return a simple admin implementation that doesn't use QOR
+	return &SimpleAdminSetup{}
 }
 
 // CreateAdminAuthController creates an admin auth controller
@@ -50,4 +52,27 @@ func (f *Factory) CreateDashboardController() interfaces.DashboardInterface {
 		withdrawalRepo,
 		kycRepo,
 	)
+}
+
+// SimpleAdminSetup is a basic implementation that doesn't use QOR Admin
+type SimpleAdminSetup struct{}
+
+// MountTo mounts the admin interface to the given path
+func (s *SimpleAdminSetup) MountTo(mountPath string, router *gin.Engine) {
+	// Just add a simple handler for the admin path
+	router.GET(mountPath, func(c *gin.Context) {
+		c.HTML(http.StatusOK, "admin/dashboard.html", gin.H{
+			"title":              "Admin Dashboard",
+			"totalUsers":         0,
+			"totalDeposits":      0,
+			"pendingWithdrawals": 0,
+			"recentTransactions": []interface{}{},
+			"pendingKYC":         []interface{}{},
+		})
+	})
+}
+
+// SetupAuth sets up authentication for the admin interface
+func (s *SimpleAdminSetup) SetupAuth() {
+	// No-op for simple implementation
 }

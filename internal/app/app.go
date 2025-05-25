@@ -1,6 +1,10 @@
 package app
 
 import (
+	"net/http"
+	"os"
+	"path/filepath"
+
 	"github.com/Caqil/investment-api/config"
 	"github.com/Caqil/investment-api/internal/admin"
 	"github.com/Caqil/investment-api/internal/controller"
@@ -17,7 +21,7 @@ import (
 
 type App struct {
 	config     *config.Config
-	mongoConn  *database.MongoDBConnection
+	mongoConn  *database.MongoDBConnection // Make sure this field exists
 	jwtService *service.JWTService
 }
 
@@ -35,8 +39,14 @@ func (a *App) SetupRoutes() *gin.Engine {
 
 	r := gin.Default()
 
-	// Load templates
-	r.LoadHTMLGlob("templates/**/*")
+	templateDir := "templates"
+	if _, err := os.Stat(templateDir); !os.IsNotExist(err) {
+		templatePattern := filepath.Join(templateDir, "**", "*")
+		matches, err := filepath.Glob(templatePattern)
+		if err == nil && len(matches) > 0 {
+			r.LoadHTMLGlob(templatePattern)
+		}
+	}
 
 	// Serve static files
 	r.Static("/static", "./public/static")
@@ -87,12 +97,14 @@ func (a *App) SetupRoutes() *gin.Engine {
 			ReferralProfitPercentage: a.config.App.ReferralProfitPercentage,
 		},
 	)
-	taskService := service.NewTaskService(taskRepo)
+	taskService := service.NewTaskService(taskRepo, a.mongoConn)
+
 	withdrawalService := service.NewWithdrawalService(
 		withdrawalRepo,
 		transactionRepo,
 		userRepo,
 		taskService,
+		a.mongoConn, // Use a.mongoConn here
 		struct {
 			MinimumWithdrawalAmount float64
 		}{
@@ -125,7 +137,22 @@ func (a *App) SetupRoutes() *gin.Engine {
 	authMiddleware := middleware.NewAuthMiddleware(a.jwtService.GetJWTManager(), userRepo)
 	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService)
 	adminMiddleware := middleware.NewAdminMiddleware(userRepo)
-
+	r.GET("/admin", func(c *gin.Context) {
+		if _, err := os.Stat("templates/admin/dashboard.html"); !os.IsNotExist(err) {
+			c.HTML(http.StatusOK, "admin/dashboard.html", gin.H{
+				"title":              "Admin Dashboard",
+				"totalUsers":         0,
+				"totalDeposits":      0,
+				"pendingWithdrawals": 0,
+				"recentTransactions": []interface{}{},
+				"pendingKYC":         []interface{}{},
+			})
+		} else {
+			c.JSON(http.StatusOK, gin.H{
+				"message": "Admin interface available via API only. Web interface is being configured.",
+			})
+		}
+	})
 	// Public routes
 	api := r.Group("/api")
 	{

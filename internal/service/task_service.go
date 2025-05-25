@@ -6,6 +6,7 @@ import (
 
 	"github.com/Caqil/investment-api/internal/model"
 	"github.com/Caqil/investment-api/internal/repository"
+	"github.com/Caqil/investment-api/pkg/database"
 )
 
 type TaskService struct {
@@ -13,10 +14,10 @@ type TaskService struct {
 	userTaskRepo *repository.UserTaskRepository
 }
 
-func NewTaskService(taskRepo *repository.TaskRepository) *TaskService {
+func NewTaskService(taskRepo *repository.TaskRepository, mongoConn *database.MongoDBConnection) *TaskService {
 	return &TaskService{
 		taskRepo:     taskRepo,
-		userTaskRepo: repository.NewUserTaskRepository(taskRepo.GetDB()),
+		userTaskRepo: repository.NewUserTaskRepository(mongoConn),
 	}
 }
 

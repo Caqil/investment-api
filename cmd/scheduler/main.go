@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"log"
 	"os"
 	"os/signal"
@@ -24,17 +23,17 @@ func main() {
 	// Load configuration
 	cfg := config.NewConfig()
 
-	// Connect to database
-	db, err := database.NewMySQLConnection(cfg.Database)
+	// Connect to MongoDB
+	mongoConn, err := database.NewMongoDBConnection(cfg.Database)
 	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
+		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
-	defer db.Close()
+	defer mongoConn.Close()
 
 	// Initialize repositories
-	userRepo := repository.NewUserRepository(db)
-	transactionRepo := repository.NewTransactionRepository(db)
-	notificationRepo := repository.NewNotificationRepository(db)
+	userRepo := repository.NewUserRepository(mongoConn)
+	transactionRepo := repository.NewTransactionRepository(mongoConn)
+	notificationRepo := repository.NewNotificationRepository(mongoConn)
 
 	// Initialize bonus service
 	bonusService := service.NewBonusService(
@@ -73,11 +72,13 @@ func main() {
 }
 
 // addDailyBonusJob is a manually triggered function to add daily bonuses
-func addDailyBonusJob(db *sql.DB, cfg *config.Config) {
-	userRepo := repository.NewUserRepository(db)
-	transactionRepo := repository.NewTransactionRepository(db)
-	notificationRepo := repository.NewNotificationRepository(db)
+func addDailyBonusJob(mongoConn *database.MongoDBConnection, cfg *config.Config) {
+	// Initialize repositories
+	userRepo := repository.NewUserRepository(mongoConn)
+	transactionRepo := repository.NewTransactionRepository(mongoConn)
+	notificationRepo := repository.NewNotificationRepository(mongoConn)
 
+	// Initialize bonus service
 	bonusService := service.NewBonusService(
 		userRepo,
 		transactionRepo,

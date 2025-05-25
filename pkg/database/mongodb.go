@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Caqil/investment-api/config"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -17,8 +16,16 @@ type MongoDBConnection struct {
 	Database *mongo.Database
 }
 
+// MongoDBConfig holds configuration for MongoDB connection
+type MongoDBConfig struct {
+	URI            string
+	Name           string
+	ConnectTimeout int
+	MaxPoolSize    uint64
+}
+
 // NewMongoDBConnection creates a new MongoDB connection
-func NewMongoDBConnection(cfg config.Database) (*MongoDBConnection, error) {
+func NewMongoDBConnection(cfg MongoDBConfig) (*MongoDBConnection, error) {
 	// Create a context with timeout for the connection
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.ConnectTimeout)*time.Second)
 	defer cancel()

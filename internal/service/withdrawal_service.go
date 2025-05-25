@@ -7,6 +7,7 @@ import (
 
 	"github.com/Caqil/investment-api/internal/model"
 	"github.com/Caqil/investment-api/internal/repository"
+	"github.com/Caqil/investment-api/pkg/database"
 )
 
 type WithdrawalService struct {
@@ -14,6 +15,7 @@ type WithdrawalService struct {
 	transactionRepo *repository.TransactionRepository
 	userRepo        *repository.UserRepository
 	taskService     *TaskService
+	mongoConn       *database.MongoDBConnection // Add this field
 	config          struct {
 		MinimumWithdrawalAmount float64
 	}
@@ -24,6 +26,7 @@ func NewWithdrawalService(
 	transactionRepo *repository.TransactionRepository,
 	userRepo *repository.UserRepository,
 	taskService *TaskService,
+	mongoConn *database.MongoDBConnection, // Add this parameter
 	config struct {
 		MinimumWithdrawalAmount float64
 	},
@@ -33,6 +36,7 @@ func NewWithdrawalService(
 		transactionRepo: transactionRepo,
 		userRepo:        userRepo,
 		taskService:     taskService,
+		mongoConn:       mongoConn,
 		config:          config,
 	}
 }
@@ -226,7 +230,13 @@ func (s *WithdrawalService) GetAllWithdrawals(limit, offset int) ([]*model.Withd
 
 // GetTotalWithdrawalsByStatus gets the total count of withdrawals with a specific status
 func (s *WithdrawalService) GetTotalWithdrawalsByStatus(status model.WithdrawalStatus) (int, error) {
-	return s.withdrawalRepo.CountByStatus(status)
+	count, err := s.withdrawalRepo.CountByStatus(status)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert int64 to int
+	return int(count), nil
 }
 
 // CalculateDailyWithdrawalAmount calculates the total withdrawal amount for a user on a given day
@@ -237,8 +247,6 @@ func (s *WithdrawalService) CalculateDailyWithdrawalAmount(userID int64, date ti
 		date,
 	)
 }
-
-// CheckWithdrawalLimit checks if a user has reached their daily withdrawal limit
 func (s *WithdrawalService) CheckWithdrawalLimit(userID int64, amount float64) (bool, float64, error) {
 	// Get user's plan
 	user, err := s.userRepo.FindByID(userID)
@@ -250,7 +258,7 @@ func (s *WithdrawalService) CheckWithdrawalLimit(userID int64, amount float64) (
 	}
 
 	// Get plan
-	planRepo := repository.NewPlanRepository(s.withdrawalRepo.GetDB())
+	planRepo := repository.NewPlanRepository(s.mongoConn) // Use mongoConn instead of withdrawalRepo.GetDB()
 	plan, err := planRepo.FindByID(user.PlanID)
 	if err != nil {
 		return false, 0, err
