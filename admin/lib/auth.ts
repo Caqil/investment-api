@@ -60,6 +60,7 @@ export interface User {
   phone: string;
   balance: number;
   referral_code: string;
+  plan_id: number; // Add this line
   is_kyc_verified: boolean;
   email_verified: boolean;
   is_admin?: boolean;
