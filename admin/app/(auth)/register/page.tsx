@@ -42,9 +42,10 @@ export default function RegisterPage() {
   const [deviceId, setDeviceId] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Get referral code from URL if present
-  const referralCode = searchParams.get("ref") || "";
+  const referralCode = searchParams?.get("ref") || "";
 
   // Initialize form with default values
   const form = useForm<RegisterFormValues>({
@@ -58,34 +59,41 @@ export default function RegisterPage() {
     },
   });
 
-  // Check if device is virtual
+  // Check if device is virtual - only run once
   useEffect(() => {
+    if (isInitialized) return;
+
     const checkDevice = async () => {
       try {
-        const id = await getDeviceId();
+        // Try to get device ID from localStorage first
+        let id = localStorage.getItem("device_id");
+
+        if (!id) {
+          // If not in localStorage, generate one
+          id = await getDeviceId();
+        }
+
         setDeviceId(id);
+        setIsInitialized(true);
 
-        // Simple check for virtual device - in production you would use a more robust method
-        const isVirtual =
-          id.includes("emulator") ||
-          id.includes("virtual") ||
-          id.includes("generic");
-
-        setIsVirtualDevice(isVirtual);
+        // For admin panel, we don't need to block virtual devices
+        setIsVirtualDevice(false);
       } catch (error) {
         console.error("Error getting device ID:", error);
+        // Fallback device ID
+        const fallbackId =
+          "admin_" + Math.random().toString(36).substring(2, 15);
+        setDeviceId(fallbackId);
+        setIsInitialized(true);
       }
     };
 
     checkDevice();
-  }, []);
+  }, [isInitialized]);
 
   const onSubmit = async (values: RegisterFormValues) => {
-    // Show error if virtual device is detected
-    if (isVirtualDevice) {
-      setError("Registration is not allowed on virtual devices or emulators.");
-      return;
-    }
+    // Don't submit if already submitting
+    if (isSubmitting) return;
 
     // Reset states
     setError(null);
@@ -113,173 +121,144 @@ export default function RegisterPage() {
       }, 2000);
     } catch (error: any) {
       console.error("Registration error:", error);
-
-      // Handle different error scenarios
-      if (error.response?.data?.error) {
-        setError(error.response.data.error);
-      } else if (error.message) {
-        setError(error.message);
-      } else {
-        setError("An error occurred during registration. Please try again.");
-      }
+      setError(
+        error.message ||
+          "An error occurred during registration. Please try again."
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-8">
-      <div className="w-full max-w-md p-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
-        <div className="space-y-6">
-          <div className="flex justify-between items-center">
-            <Link
-              href="/login"
-              className="text-sm flex items-center text-gray-500 hover:text-primary"
-            >
-              <ArrowLeft className="w-4 h-4 mr-1" />
-              Back to Login
-            </Link>
-            <FingerprintIcon className="w-8 h-8 text-primary" />
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <Link
+          href="/login"
+          className="text-sm flex items-center text-gray-500 hover:text-primary"
+        >
+          <ArrowLeft className="w-4 h-4 mr-1" />
+          Back to Login
+        </Link>
+        <FingerprintIcon className="w-8 h-8 text-primary" />
+      </div>
+
+      <div className="space-y-2 text-center">
+        <h1 className="text-2xl font-bold">Create an Account</h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Enter your details to register for a new account
+        </p>
+      </div>
+
+      {error && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && (
+        <Alert className="bg-green-50 border-green-500 text-green-800 dark:bg-green-900/20 dark:border-green-500 dark:text-green-400">
+          <Check className="h-4 w-4" />
+          <AlertTitle>Success</AlertTitle>
+          <AlertDescription>
+            Registration successful! Please check your email for verification.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <FormField
+            control={form.control}
+            name="name"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Full Name</FormLabel>
+                <FormControl>
+                  <Input placeholder="John Doe" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="name@example.com"
+                    type="email"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input type="password" placeholder="••••••••" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone Number</FormLabel>
+                <FormControl>
+                  <Input placeholder="+1234567890" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name="referCode"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Referral Code (Optional)</FormLabel>
+                <FormControl>
+                  <Input placeholder="Enter referral code" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <div className="pt-2">
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Creating Account..." : "Create Account"}
+            </Button>
           </div>
+        </form>
+      </Form>
 
-          <div className="space-y-2 text-center">
-            <h1 className="text-2xl font-bold">Create an Account</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Enter your details to register for a new account
-            </p>
-          </div>
-
-          {isVirtualDevice && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>
-                Registration is not allowed on virtual devices or emulators.
-                Please use a physical device.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {success && (
-            <Alert className="bg-green-50 border-green-500 text-green-800 dark:bg-green-900/20 dark:border-green-500 dark:text-green-400">
-              <Check className="h-4 w-4" />
-              <AlertTitle>Success</AlertTitle>
-              <AlertDescription>
-                Registration successful! Please check your email for
-                verification.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="John Doe" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="name@example.com"
-                        type="email"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="••••••••"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+1234567890" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="referCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Referral Code (Optional)</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter referral code" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="pt-2">
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={isSubmitting || isVirtualDevice}
-                >
-                  {isSubmitting ? "Creating Account..." : "Create Account"}
-                </Button>
-              </div>
-            </form>
-          </Form>
-
-          <div className="text-center text-sm">
-            <p className="text-gray-500 dark:text-gray-400">
-              Already have an account?{" "}
-              <Link href="/login" className="text-primary hover:underline">
-                Login
-              </Link>
-            </p>
-          </div>
-        </div>
+      <div className="text-center text-sm">
+        <p className="text-gray-500 dark:text-gray-400">
+          Already have an account?{" "}
+          <Link href="/login" className="text-primary hover:underline">
+            Login
+          </Link>
+        </p>
       </div>
     </div>
   );

@@ -1,43 +1,43 @@
-// admin/middleware.ts
+// middleware.ts
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Simple middleware that only handles basic auth redirects
 export function middleware(request: NextRequest) {
-  // Define public and protected paths
+  // Get the pathname
   const { pathname } = request.nextUrl;
-  const publicPaths = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
-  const isPublicPath = publicPaths.some(path => pathname === path || pathname.startsWith(`${path}/`));
   
-  // Get token from cookie
+  // Define authentication routes that don't require auth
+  const authRoutes = ['/login', '/register', '/verify-email', '/forgot-password', '/reset-password'];
+  const isAuthRoute = authRoutes.some(route => pathname === route);
+  
+  // Get token from cookies - safely
   const token = request.cookies.get('auth_token')?.value;
   
-  // Redirect logic
-  if (!isPublicPath && !token) {
-    // Redirect to login if trying to access protected route without token
+  // Only apply redirections for non-static content
+  if (pathname.startsWith('/_next') || 
+      pathname.startsWith('/favicon.ico') ||
+      pathname.startsWith('/api')) {
+    return NextResponse.next();
+  }
+  
+  // Handle redirects based on auth state
+  if (!token && !isAuthRoute) {
+    // Redirect to login if not authenticated and not on an auth route
     return NextResponse.redirect(new URL('/login', request.url));
   }
   
-  if (pathname === '/login' && token) {
-    // Redirect to dashboard if trying to access login with token
+  if (token && pathname === '/login') {
+    // Redirect to dashboard if authenticated and trying to access login
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
   
   return NextResponse.next();
 }
 
-// Apply middleware only to specific routes
+// Apply middleware to specific routes only
 export const config = {
   matcher: [
-    '/',
-    '/dashboard/:path*',
-    '/users/:path*',
-    '/withdrawals/:path*',
-    '/kyc/:path*',
-    '/plans/:path*',
-    '/tasks/:path*',
-    '/transactions/:path*',
-    '/notifications/:path*',
-    '/settings/:path*',
-    '/login',
+    '/((?!_next/static|_next/image|images|favicon.ico).*)',
   ],
 };

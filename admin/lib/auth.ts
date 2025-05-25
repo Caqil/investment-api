@@ -1,6 +1,6 @@
 'use client';
 
-import axios, { AxiosError, AxiosInstance, AxiosResponse } from 'axios';
+import axios, { AxiosError, AxiosInstance } from 'axios';
 
 // API base URL - configure this according to your environment
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
@@ -8,7 +8,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/a
 // Local storage keys
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'user_data';
-const DEVICE_KEY = 'device_id';
 
 // Auth-related types
 export interface RegisterRequest {
@@ -41,16 +40,12 @@ export interface ResetPasswordRequest {
   new_password: string;
 }
 
-export interface EnableBiometricRequest {
-  user_id: number;
-}
-
 export interface ApiResponse<T = any> {
   message?: string;
   error?: string;
   user?: T;
   token?: string;
-  [key: string]: any; // Allow for additional fields
+  [key: string]: any;
 }
 
 export interface User {
@@ -60,7 +55,7 @@ export interface User {
   phone: string;
   balance: number;
   referral_code: string;
-  plan_id: number; // Add this line
+  plan_id: number;
   is_kyc_verified: boolean;
   email_verified: boolean;
   is_admin?: boolean;
@@ -100,7 +95,7 @@ api.interceptors.request.use((config) => {
     }
     
     // Add device ID header if available
-    const deviceId = localStorage.getItem(DEVICE_KEY);
+    const deviceId = localStorage.getItem('device_id');
     if (deviceId && config.headers) {
       config.headers['X-Device-ID'] = deviceId;
     }
@@ -130,7 +125,6 @@ function handleApiError(error: unknown): never {
     const authError: AuthError = {
       status: axiosError.response?.status || 500,
       message: errorMessage,
-      details: axiosError.response?.data
     };
     
     throw authError;
@@ -138,13 +132,11 @@ function handleApiError(error: unknown): never {
     throw {
       status: 500,
       message: error.message,
-      details: error
     } as AuthError;
   } else {
     throw {
       status: 500,
       message: 'An unknown error occurred',
-      details: error
     } as AuthError;
   }
 }
@@ -156,7 +148,7 @@ export async function registerUser(data: RegisterRequest): Promise<User> {
     
     // Store device ID for future requests
     if (typeof window !== 'undefined') {
-      localStorage.setItem(DEVICE_KEY, data.device_id);
+      localStorage.setItem('device_id', data.device_id);
     }
     
     return response.data.user as User;
@@ -174,103 +166,22 @@ export async function verifyEmail(data: VerifyEmailRequest): Promise<void> {
   }
 }
 
-// Resend verification code
-export async function resendVerificationCode(email: string): Promise<void> {
-  try {
-    await api.post<ApiResponse>('/auth/resend-verification', { email });
-  } catch (error) {
-    handleApiError(error);
-  }
-}
-
 // Login user
 export async function loginUser(data: LoginRequest): Promise<AuthResponse> {
   try {
     const response = await api.post<AuthResponse>('/auth/login', data);
     
-    // Store auth data in localStorage
+    // Store auth data in localStorage - carefully to avoid circular references
     if (typeof window !== 'undefined') {
       localStorage.setItem(TOKEN_KEY, response.data.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(response.data.user));
-      localStorage.setItem(DEVICE_KEY, data.device_id);
+      
+      // Clone the user object and remove any potential circular references
+      const safeUser = { ...response.data.user };
+      localStorage.setItem(USER_KEY, JSON.stringify(safeUser));
+      localStorage.setItem('device_id', data.device_id);
     }
     
     return response.data;
-  } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-// Request password reset
-export async function forgotPassword(email: string): Promise<void> {
-  try {
-    await api.post<ApiResponse>('/auth/forgot-password', { email });
-  } catch (error) {
-    handleApiError(error);
-  }
-}
-
-// Reset password
-export async function resetPassword(data: ResetPasswordRequest): Promise<void> {
-  try {
-    await api.post<ApiResponse>('/auth/reset-password', data);
-  } catch (error) {
-    handleApiError(error);
-  }
-}
-
-// Enable biometric authentication
-export async function enableBiometric(): Promise<void> {
-  try {
-    await api.post<ApiResponse>('/user/enable-biometric');
-  } catch (error) {
-    handleApiError(error);
-  }
-}
-
-// Disable biometric authentication
-export async function disableBiometric(): Promise<void> {
-  try {
-    await api.post<ApiResponse>('/user/disable-biometric');
-  } catch (error) {
-    handleApiError(error);
-  }
-}
-
-// Change password
-export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
-  try {
-    await api.put<ApiResponse>('/user/change-password', {
-      current_password: currentPassword,
-      new_password: newPassword
-    });
-  } catch (error) {
-    handleApiError(error);
-  }
-}
-
-// Update user profile
-export async function updateProfile(data: {
-  name: string;
-  phone: string;
-  profile_pic_url?: string;
-}): Promise<User> {
-  try {
-    const response = await api.put<ApiResponse<User>>('/user/profile', data);
-    
-    // Update stored user data
-    const updatedUser = response.data.user;
-    if (typeof window !== 'undefined' && updatedUser) {
-      const currentUser = getCurrentUser();
-      if (currentUser) {
-        localStorage.setItem(USER_KEY, JSON.stringify({
-          ...currentUser,
-          ...updatedUser
-        }));
-      }
-    }
-    
-    return response.data.user as User;
   } catch (error) {
     return handleApiError(error);
   }
@@ -281,7 +192,10 @@ export function logout(): void {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
-    // Keep device ID for future logins
+    // We keep device_id for future logins
+    
+    // Remove auth cookie
+    document.cookie = 'auth_token=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
     
     // Redirect to login page
     window.location.href = '/login';
@@ -297,7 +211,7 @@ export function isAuthenticated(): boolean {
   return !!localStorage.getItem(TOKEN_KEY);
 }
 
-// Get current user
+// Get current user with safe parsing
 export function getCurrentUser(): User | null {
   if (typeof window === 'undefined') {
     return null;
@@ -312,7 +226,8 @@ export function getCurrentUser(): User | null {
     return JSON.parse(userJson) as User;
   } catch (error) {
     console.error('Error parsing user data:', error);
-    logout(); // Clear invalid data
+    // Don't call logout directly to avoid potential loops
+    localStorage.removeItem(USER_KEY);
     return null;
   }
 }
@@ -324,40 +239,6 @@ export function getAuthToken(): string | null {
   }
   
   return localStorage.getItem(TOKEN_KEY);
-}
-
-// Get stored device ID
-export function getStoredDeviceId(): string | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-  
-  return localStorage.getItem(DEVICE_KEY);
-}
-
-// Store device ID
-export function storeDeviceId(deviceId: string): void {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(DEVICE_KEY, deviceId);
-  }
-}
-
-// Check if user has verified email
-export function isEmailVerified(): boolean {
-  const user = getCurrentUser();
-  return !!user?.email_verified;
-}
-
-// Check if user has completed KYC
-export function isKycVerified(): boolean {
-  const user = getCurrentUser();
-  return !!user?.is_kyc_verified;
-}
-
-// Check if user has biometric enabled
-export function isBiometricEnabled(): boolean {
-  const user = getCurrentUser();
-  return !!user?.biometric_enabled;
 }
 
 // Export the API instance for other services to use

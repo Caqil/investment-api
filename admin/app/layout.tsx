@@ -1,14 +1,14 @@
-import { ThemeProvider } from "@/components/theme-provider";
-import "./globals.css";
+// app/layout.tsx
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
+import "./globals.css";
+import { AuthProvider } from "@/contexts/auth-context";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Investment App",
-  description: "Earn daily bonuses and invest with friends",
+  title: "Investment Admin",
+  description: "Admin panel for the Investment platform",
 };
 
 export default function RootLayout({
@@ -17,12 +17,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
-          <Toaster />
-        </ThemeProvider>
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );
