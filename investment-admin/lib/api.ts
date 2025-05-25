@@ -217,8 +217,13 @@ export const api = {
   // Transaction endpoints
   transactions: {
     getAll: async () => {
-      // Replace with your actual endpoint for transactions
       return request('/admin/transactions');
+    },
+    getByUserId: async (userId: number) => {
+      return request(`/admin/users/${userId}/transactions`);
+    },
+    getRecentTransactions: async (limit: number = 5) => {
+      return request(`/admin/transactions/recent?limit=${limit}`);
     }
   },
   

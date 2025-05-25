@@ -1,6 +1,36 @@
 // src/hooks/use-dashboard-data.ts
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
+// Extend the User type from auth with additional properties needed for dashboard
+import { User as BaseUser } from '@/types/auth';
+
+// Extended User interface with additional properties
+interface User extends BaseUser {
+  plan_id: number;
+  is_blocked: boolean;
+  profile_pic_url?: string;
+}
+
+import { Plan } from '@/types/plan';
+import { Withdrawal } from '@/types/withdrawal';
+import { KYCDocument } from '@/types/kyc';
+
+// API response interfaces
+interface UsersResponse {
+  users: User[];
+}
+
+interface WithdrawalsResponse {
+  withdrawals: Withdrawal[];
+}
+
+interface KYCResponse {
+  kyc_documents: KYCDocument[];
+}
+
+interface PlansResponse {
+  plans: Plan[];
+}
 
 // Dashboard stats types
 export interface DashboardStats {
@@ -10,10 +40,24 @@ export interface DashboardStats {
   pendingWithdrawals: number;
   pendingKyc: number;
   planDistribution: { name: string; value: number }[];
-  recentUsers: any[];
-  recentWithdrawals: any[];
+  recentUsers: User[];
+  recentWithdrawals: Withdrawal[];
   isLoading: boolean;
   error: string | null;
+}
+
+// Activity item type
+export interface ActivityItem {
+  id: string;
+  type: 'join' | 'deposit' | 'withdraw' | 'kyc' | 'plan';
+  user: {
+    name: string;
+    email: string;
+    avatar?: string;
+  };
+  timestamp: string;
+  details: string;
+  amount?: number;
 }
 
 // Default empty stats
@@ -43,7 +87,7 @@ export function useDashboardStats() {
           throw new Error(usersResponse.error);
         }
         
-        const users = usersResponse.data?.users || [];
+        const users = (usersResponse.data as UsersResponse)?.users || [];
         const totalUsers = users.length;
         const activeUsers = users.filter(user => !user.is_blocked).length;
         
@@ -58,7 +102,7 @@ export function useDashboardStats() {
           throw new Error(withdrawalsResponse.error);
         }
         
-        const withdrawals = withdrawalsResponse.data?.withdrawals || [];
+        const withdrawals = (withdrawalsResponse.data as WithdrawalsResponse)?.withdrawals || [];
         const pendingWithdrawals = withdrawals.length;
         
         // Sort withdrawals by creation date (newest first) and take the first 5
@@ -72,7 +116,7 @@ export function useDashboardStats() {
           throw new Error(kycResponse.error);
         }
         
-        const pendingKyc = (kycResponse.data?.kyc_documents || []).length;
+        const pendingKyc = ((kycResponse.data as KYCResponse)?.kyc_documents || []).length;
         
         // Fetch plans
         const plansResponse = await api.plans.getAll();
@@ -80,7 +124,7 @@ export function useDashboardStats() {
           throw new Error(plansResponse.error);
         }
         
-        const plans = plansResponse.data?.plans || [];
+        const plans = (plansResponse.data as PlansResponse)?.plans || [];
         
         // Calculate plan distribution
         const planCounts: Record<string, number> = {};
@@ -134,7 +178,7 @@ export function useDashboardStats() {
 
 // Hook to get recent activity data
 export function useRecentActivity() {
-  const [activities, setActivities] = useState<any[]>([]);
+  const [activities, setActivities] = useState<ActivityItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -151,12 +195,12 @@ export function useRecentActivity() {
         if (withdrawalsResponse.error) throw new Error(withdrawalsResponse.error);
         if (kycResponse.error) throw new Error(kycResponse.error);
 
-        const users = usersResponse.data?.users || [];
-        const withdrawals = withdrawalsResponse.data?.withdrawals || [];
-        const kycDocs = kycResponse.data?.kyc_documents || [];
+        const users = (usersResponse.data as UsersResponse)?.users || [];
+        const withdrawals = (withdrawalsResponse.data as WithdrawalsResponse)?.withdrawals || [];
+        const kycDocs = (kycResponse.data as KYCResponse)?.kyc_documents || [];
 
         // Create activity items
-        const activityItems: any[] = [];
+        const activityItems: ActivityItem[] = [];
         
         // Add user join activities
         users.slice(0, 10).forEach(user => {
@@ -230,9 +274,15 @@ export function useRecentActivity() {
   return { activities, isLoading, error };
 }
 
+// Interface for transaction data
+interface TransactionData {
+  name: string; 
+  amount: number;
+}
+
 // Hook to get transaction data by type and time period
 export function useTransactionData(type: string, period: string) {
-  const [data, setData] = useState<{ name: string; amount: number }[]>([]);
+  const [data, setData] = useState<TransactionData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -243,7 +293,7 @@ export function useTransactionData(type: string, period: string) {
         // const response = await api.transactions.getByTypeAndPeriod(type, period);
         
         // For now, let's create an empty dataset since we don't have this endpoint
-        const emptyData = [];
+        const emptyData: TransactionData[] = [];
         
         if (period === 'daily') {
           const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];

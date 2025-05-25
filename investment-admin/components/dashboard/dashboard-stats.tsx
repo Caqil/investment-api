@@ -11,7 +11,6 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn, formatCurrency } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface StatsCardProps {
