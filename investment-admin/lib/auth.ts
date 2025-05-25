@@ -1,8 +1,15 @@
 // src/lib/auth.ts
 import { User } from '../types/auth';
+import { jwtDecode } from 'jwt-decode';
 
 const TOKEN_KEY = 'admin_token';
 const USER_KEY = 'admin_user';
+
+interface JwtPayload {
+  exp: number;
+  user_id: number;
+  [key: string]: any;
+}
 
 export function setToken(token: string): void {
   if (typeof window !== 'undefined') {
@@ -37,6 +44,8 @@ export function getUser(): User | null {
         return JSON.parse(userJson) as User;
       } catch (e) {
         console.error('Error parsing user from localStorage:', e);
+        // Clear invalid user data
+        removeUser();
       }
     }
   }
@@ -50,7 +59,31 @@ export function removeUser(): void {
 }
 
 export function isAuthenticated(): boolean {
-  return !!getToken() && !!getUser();
+  const token = getToken();
+  const user = getUser();
+  
+  if (!token || !user) {
+    return false;
+  }
+  
+  // Check if token is expired
+  try {
+    const decoded = jwtDecode<JwtPayload>(token);
+    const currentTime = Date.now() / 1000;
+    
+    if (decoded.exp < currentTime) {
+      // Token expired, clean up
+      logout();
+      return false;
+    }
+    
+    return true;
+  } catch (e) {
+    // Invalid token format
+    console.error('Invalid token format:', e);
+    logout();
+    return false;
+  }
 }
 
 export function logout(): void {
@@ -60,28 +93,4 @@ export function logout(): void {
 
 export function isAdmin(user: User | null): boolean {
   return !!user && user.is_admin;
-}
-
-// Function to check if token is expired (for JWT tokens)
-export function isTokenExpired(token: string): boolean {
-  try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(function (c) {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        })
-        .join('')
-    );
-
-    const { exp } = JSON.parse(jsonPayload);
-    const currentTime = Math.floor(Date.now() / 1000);
-    
-    return exp < currentTime;
-  } catch (e) {
-    console.error('Error checking token expiration:', e);
-    return true; // If we can't parse the token, assume it's expired
-  }
 }

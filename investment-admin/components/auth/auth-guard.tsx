@@ -1,10 +1,10 @@
-// src/components/auth/auth-guard.tsx
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuth } from "./auth-provider";
 import { Loader2 } from "lucide-react";
+import { isAuthenticated } from "@/lib/auth";
+import { useAuth } from "@/providers/auth-provider";
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -13,28 +13,45 @@ interface AuthGuardProps {
 const PUBLIC_PATHS = ["/login"];
 
 export function AuthGuard({ children }: AuthGuardProps) {
-  const { loading, isAuthenticated } = useAuth();
+  const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   const isPublicPath = PUBLIC_PATHS.includes(pathname || "");
 
   useEffect(() => {
-    if (!loading) {
-      // If not authenticated and not on a public path, redirect to login
-      if (!isAuthenticated && !isPublicPath) {
-        router.push("/login");
-      }
-
-      // If authenticated and on a public path, redirect to dashboard
-      if (isAuthenticated && isPublicPath) {
-        router.push("/dashboard");
-      }
+    // Skip for public paths - they don't need auth
+    if (isPublicPath) {
+      setIsCheckingAuth(false);
+      return;
     }
-  }, [loading, isAuthenticated, router, isPublicPath]);
 
-  // Show loading state
-  if (loading) {
+    // Check authentication status directly from localStorage
+    const authStatus = isAuthenticated();
+
+    if (!authStatus) {
+      router.push("/login");
+    }
+
+    setIsCheckingAuth(false);
+  }, [isPublicPath, pathname, router]);
+
+  // Show loading state while checking authentication
+  if (isCheckingAuth || loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="text-sm text-muted-foreground">Authenticating...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If on a public path and already logged in, redirect to dashboard
+  if (isPublicPath && user) {
+    router.push("/dashboard");
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -42,18 +59,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  // If user is on a page they're allowed to see, render children
-  if (
-    (isAuthenticated && !isPublicPath) ||
-    (!isAuthenticated && isPublicPath)
-  ) {
-    return <>{children}</>;
-  }
-
-  // This is an intermediate state while redirecting
-  return (
-    <div className="flex h-screen w-full items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-    </div>
-  );
+  // For public paths or if user is authenticated for protected paths
+  return <>{children}</>;
 }

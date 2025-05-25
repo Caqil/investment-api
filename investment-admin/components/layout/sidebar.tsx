@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -14,11 +13,14 @@ import {
   UserCheck,
   Users,
   X,
+  Bell,
+  BarChart3,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { useAuth } from "@/components/auth/auth-provider";
+import { useAuth } from "@/providers/auth-provider";
 
 interface SidebarProps {
   open: boolean;
@@ -29,11 +31,11 @@ const items = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "Users", href: "/users", icon: Users },
   { name: "Plans", href: "/plans", icon: CreditCard },
-  { name: "Payments", href: "/payments", icon: CreditCard },
+  { name: "Payments", href: "/payments", icon: BarChart3 },
   { name: "Withdrawals", href: "/withdrawals", icon: CreditCard },
-  { name: "KYC Verification", href: "/kyc", icon: UserCheck },
+  { name: "KYC Verification", href: "/kyc", icon: Shield },
   { name: "Tasks", href: "/tasks", icon: ListChecks },
-  { name: "Notifications", href: "/notifications", icon: FileCheck },
+  { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -52,7 +54,7 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center rounded-md px-3 py-2 text-sm font-medium",
+              "flex items-center rounded-md px-3 py-2 text-sm font-medium transition-colors",
               isActive
                 ? "bg-primary text-primary-foreground"
                 : "text-muted-foreground hover:bg-primary/10 hover:text-primary"
@@ -71,9 +73,14 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
     <>
       {/* Mobile sidebar */}
       <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent side="left" className="w-64 p-0">
+        <SheetContent side="left" className="w-64 p-0 border-r">
           <div className="flex h-16 items-center border-b px-4">
-            <h2 className="text-lg font-semibold">Admin Dashboard</h2>
+            <div className="flex items-center">
+              <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center mr-2">
+                <span className="text-primary-foreground font-bold">IA</span>
+              </div>
+              <h2 className="text-lg font-semibold">Admin Dashboard</h2>
+            </div>
             <Button
               variant="ghost"
               size="icon"
@@ -89,7 +96,7 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
             <div className="px-2 py-2">
               <Button
                 variant="ghost"
-                className="w-full justify-start"
+                className="w-full justify-start text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
                 onClick={logout}
               >
                 <LogOut className="mr-3 h-5 w-5" />
@@ -101,9 +108,14 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
       </Sheet>
 
       {/* Desktop sidebar */}
-      <div className="hidden h-screen w-64 flex-col border-r bg-white md:flex">
+      <div className="hidden h-screen w-64 flex-col border-r bg-background md:flex">
         <div className="flex h-16 items-center border-b px-4">
-          <h2 className="text-lg font-semibold">Admin Dashboard</h2>
+          <div className="flex items-center">
+            <div className="h-8 w-8 rounded-md bg-primary flex items-center justify-center mr-2">
+              <span className="text-primary-foreground font-bold">IA</span>
+            </div>
+            <h2 className="text-lg font-semibold">Admin Dashboard</h2>
+          </div>
         </div>
         <ScrollArea className="flex-1">
           <div className="px-2 py-2">{links}</div>
@@ -111,7 +123,7 @@ export function Sidebar({ open, onOpenChange }: SidebarProps) {
         <div className="border-t p-2">
           <Button
             variant="ghost"
-            className="w-full justify-start"
+            className="w-full justify-start text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
             onClick={logout}
           >
             <LogOut className="mr-3 h-5 w-5" />

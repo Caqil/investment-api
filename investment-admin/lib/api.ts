@@ -1,58 +1,73 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // src/lib/api.ts
 import { ApiResponse } from '../types/api';
 import { AuthResponse, LoginCredentials } from '../types/auth';
 import { getToken } from './auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+
 /**
  * Generic request function with error handling
  */
 async function request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
-    try {
-      const token = getToken();
-      
-      // Create headers object with type assertion
-      const headers = {
-        'Content-Type': 'application/json',
-        ...(options.headers as Record<string, string>)
-      } as Record<string, string>;
-  
-      // Add authorization header if token exists
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-  
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        ...options,
-        headers
-      });
-  
-      const data = await response.json();
-  
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  try {
+    const token = getToken();
+    
+    // Create headers object with type assertion
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers as Record<string, string>)
+    } as Record<string, string>;
+
+    // Add authorization header if token exists
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    // Add cache control for GET requests to prevent stale data
+    if (!options.method || options.method === 'GET') {
+      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      headers['Pragma'] = 'no-cache';
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers
+    });
+
+    // For non-json responses
+    if (!response.headers.get('content-type')?.includes('application/json')) {
       if (!response.ok) {
         return {
-          error: data.error || `Request failed with status ${response.status}`
+          error: `Request failed with status ${response.status}`
         };
       }
-  
-      return { data: data as T };
-    } catch (error) {
-      console.error('API request error:', error);
+      return { data: {} as T };
+    }
+
+    const data = await response.json();
+
+    if (!response.ok) {
       return {
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: data.error || `Request failed with status ${response.status}`
       };
     }
+
+    return { data: data as T };
+  } catch (error) {
+    console.error('API request error:', error);
+    return {
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
+    };
   }
+}
 
 export const api = {
   // Auth endpoints
   auth: {
     login: async (credentials: LoginCredentials): Promise<ApiResponse<AuthResponse>> => {
-      // Make sure all required fields are included in the request
       return request<AuthResponse>('/auth/login', {
         method: 'POST',
         body: JSON.stringify({
@@ -62,9 +77,15 @@ export const api = {
         })
       });
     },
-    validateToken: async (): Promise<ApiResponse<boolean>> => {
-      // This would normally validate the token with the server
-      return request<boolean>('/auth/validate');
+    validateToken: async (): Promise<ApiResponse<{ valid: boolean }>> => {
+      return request<{ valid: boolean }>('/auth/validate');
+    }
+  },
+  
+  // Dashboard data endpoints
+  dashboard: {
+    getStats: async (): Promise<ApiResponse<any>> => {
+      return request('/admin/stats');
     }
   },
   
@@ -113,6 +134,9 @@ export const api = {
     getAll: async () => {
       return request('/admin/withdrawals');
     },
+    getPending: async () => {
+      return request('/admin/withdrawals?status=pending');
+    },
     approve: async (id: number, adminNote: string) => {
       return request(`/admin/withdrawals/${id}/approve`, {
         method: 'PUT',
@@ -132,6 +156,9 @@ export const api = {
     getAll: async () => {
       return request('/admin/kyc');
     },
+    getPending: async () => {
+      return request('/admin/kyc?status=pending');
+    },
     approve: async (id: number) => {
       return request(`/admin/kyc/${id}/approve`, {
         method: 'PUT'
@@ -139,6 +166,24 @@ export const api = {
     },
     reject: async (id: number, reason: string) => {
       return request(`/admin/kyc/${id}/reject`, {
+        method: 'PUT',
+        body: JSON.stringify({ reason })
+      });
+    }
+  },
+  
+  // Payment endpoints
+  payments: {
+    getPending: async () => {
+      return request('/admin/payments/pending');
+    },
+    approve: async (id: number) => {
+      return request(`/admin/payments/${id}/approve`, {
+        method: 'PUT'
+      });
+    },
+    reject: async (id: number, reason: string) => {
+      return request(`/admin/payments/${id}/reject`, {
         method: 'PUT',
         body: JSON.stringify({ reason })
       });
@@ -166,6 +211,14 @@ export const api = {
       return request(`/admin/tasks/${id}`, {
         method: 'DELETE'
       });
+    }
+  },
+  
+  // Transaction endpoints
+  transactions: {
+    getAll: async () => {
+      // Replace with your actual endpoint for transactions
+      return request('/admin/transactions');
     }
   },
   
