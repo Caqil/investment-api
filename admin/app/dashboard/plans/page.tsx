@@ -10,18 +10,99 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PlansTable } from "@/components/plans/plans-table";
-import { PlanFormDialog } from "@/components/plans/plan-form-dialog";
-import { plansApi } from "@/lib/api";
 import { Plan } from "@/types/plan";
-import { useToast } from "@/components/ui/use-toast";
+import { toast } from "sonner";
 import { PlusIcon } from "lucide-react";
+import axios from "axios";
+import { PlanFormDialog } from "@/components/plans/plan-form";
+
+// Define API endpoints
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+
+// Type-safe API functions
+const plansApi = {
+  getAll: async (): Promise<Plan[]> => {
+    try {
+      const response = await axios.get(`${API_URL}/admin/plans`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
+      });
+      return response.data.plans || [];
+    } catch (error) {
+      console.error("Error fetching plans:", error);
+      throw error;
+    }
+  },
+
+  create: async (planData: {
+    name: string;
+    daily_deposit_limit: number;
+    daily_withdrawal_limit: number;
+    daily_profit_limit: number;
+    price: number;
+    is_default: boolean;
+  }): Promise<Plan> => {
+    try {
+      const response = await axios.post(`${API_URL}/admin/plans`, planData, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
+      });
+      return response.data.plan;
+    } catch (error) {
+      console.error("Error creating plan:", error);
+      throw error;
+    }
+  },
+
+  update: async (
+    id: number,
+    planData: {
+      name: string;
+      daily_deposit_limit: number;
+      daily_withdrawal_limit: number;
+      daily_profit_limit: number;
+      price: number;
+      is_default: boolean;
+    }
+  ): Promise<Plan> => {
+    try {
+      const response = await axios.put(
+        `${API_URL}/admin/plans/${id}`,
+        planData,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+        }
+      );
+      return response.data.plan;
+    } catch (error) {
+      console.error("Error updating plan:", error);
+      throw error;
+    }
+  },
+
+  delete: async (id: number): Promise<void> => {
+    try {
+      await axios.delete(`${API_URL}/admin/plans/${id}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
+      });
+    } catch (error) {
+      console.error("Error deleting plan:", error);
+      throw error;
+    }
+  },
+};
 
 export default function PlansPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const { toast } = useToast();
 
   // Fetch plans data
   useEffect(() => {
@@ -34,18 +115,14 @@ export default function PlansPage() {
       } catch (error) {
         console.error("Error fetching plans:", error);
         setError("Failed to load plans data");
-        toast({
-          title: "Error",
-          description: "Failed to load plans data",
-          variant: "destructive",
-        });
+        toast.error("Failed to load plans data");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchPlans();
-  }, [toast]);
+  }, []);
 
   // Handle plan creation
   const handleCreatePlan = async (planData: {
@@ -72,18 +149,10 @@ export default function PlansPage() {
       }
 
       setShowCreateForm(false);
-
-      toast({
-        title: "Success",
-        description: "Plan created successfully",
-      });
+      toast.success("Plan created successfully");
     } catch (error) {
       console.error("Error creating plan:", error);
-      toast({
-        title: "Error",
-        description: "Failed to create plan",
-        variant: "destructive",
-      });
+      toast.error("Failed to create plan");
     }
   };
 
@@ -118,17 +187,10 @@ export default function PlansPage() {
         );
       });
 
-      toast({
-        title: "Success",
-        description: "Plan updated successfully",
-      });
+      toast.success("Plan updated successfully");
     } catch (error) {
       console.error("Error updating plan:", error);
-      toast({
-        title: "Error",
-        description: "Failed to update plan",
-        variant: "destructive",
-      });
+      toast.error("Failed to update plan");
     }
   };
 
@@ -140,17 +202,10 @@ export default function PlansPage() {
       // Remove plan from list
       setPlans((prevPlans) => prevPlans.filter((plan) => plan.id !== id));
 
-      toast({
-        title: "Success",
-        description: "Plan deleted successfully",
-      });
+      toast.success("Plan deleted successfully");
     } catch (error) {
       console.error("Error deleting plan:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete plan. Default plans cannot be deleted.",
-        variant: "destructive",
-      });
+      toast.error("Failed to delete plan. Default plans cannot be deleted.");
     }
   };
 

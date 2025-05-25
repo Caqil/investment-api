@@ -1,6 +1,10 @@
-// src/components/plans/plan-form-dialog.tsx
-import React, { useState } from "react";
-import { Button } from "../ui/button";
+// components/plans/plan-form-dialog.tsx
+"use client";
+
+import React from "react";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import {
   Dialog,
   DialogContent,
@@ -8,8 +12,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-} from "../ui/dialog";
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -18,97 +21,74 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../ui/form";
-import { Input } from "../ui/input";
-import { Switch } from "../ui/switch";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Plan } from "../../types/plan";
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plan } from "@/types/plan";
 
-// Form schema
+// Define the form schema
 const planFormSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  daily_deposit_limit: z.number().min(0, "Must be a non-negative value"),
-  daily_withdrawal_limit: z.number().min(0, "Must be a non-negative value"),
-  daily_profit_limit: z.number().min(0, "Must be a non-negative value"),
-  price: z.number().min(0, "Must be a non-negative value"),
+  name: z.string().min(1, "Name is required"),
+  daily_deposit_limit: z.coerce.number().min(0, "Must be a positive number"),
+  daily_withdrawal_limit: z.coerce.number().min(0, "Must be a positive number"),
+  daily_profit_limit: z.coerce.number().min(0, "Must be a positive number"),
+  price: z.coerce.number().min(0, "Must be a positive number"),
   is_default: z.boolean().default(false),
 });
 
+// Define the form values type using the schema
 type PlanFormValues = z.infer<typeof planFormSchema>;
 
 interface PlanFormDialogProps {
-  plan?: Plan;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-  onSubmit: (data: PlanFormValues) => Promise<void>;
-  trigger?: React.ReactNode;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (data: PlanFormValues) => Promise<void> | void;
+  initialData?: Plan; // For editing existing plan
+  title?: string;
+  description?: string;
+  submitLabel?: string;
 }
 
 export function PlanFormDialog({
-  plan,
   open,
   onOpenChange,
   onSubmit,
-  trigger,
+  initialData,
+  title = "Create Plan",
+  description = "Add a new subscription plan for users.",
+  submitLabel = "Create",
 }: PlanFormDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
-  // Controlled or uncontrolled
-  const isControlled = open !== undefined && onOpenChange !== undefined;
-  const isDialogOpen = isControlled ? open : isOpen;
-  const setIsDialogOpen = isControlled ? onOpenChange : setIsOpen;
-
-  // Initialize form
+  // Initialize form with schema resolver and default values
   const form = useForm<PlanFormValues>({
     resolver: zodResolver(planFormSchema),
-    defaultValues: plan
-      ? {
-          name: plan.name,
-          daily_deposit_limit: plan.daily_deposit_limit,
-          daily_withdrawal_limit: plan.daily_withdrawal_limit,
-          daily_profit_limit: plan.daily_profit_limit,
-          price: plan.price,
-          is_default: plan.is_default,
-        }
-      : {
-          name: "",
-          daily_deposit_limit: 10000,
-          daily_withdrawal_limit: 5000,
-          daily_profit_limit: 1000,
-          price: 0,
-          is_default: false,
-        },
+    defaultValues: {
+      name: initialData?.name || "",
+      daily_deposit_limit: initialData?.daily_deposit_limit || 0,
+      daily_withdrawal_limit: initialData?.daily_withdrawal_limit || 0,
+      daily_profit_limit: initialData?.daily_profit_limit || 0,
+      price: initialData?.price || 0,
+      is_default: initialData?.is_default || false,
+    },
   });
 
-  // Form submission handler
+  // Handle form submission
   const handleSubmit = async (values: PlanFormValues) => {
-    setIsLoading(true);
-
     try {
       await onSubmit(values);
-      setIsDialogOpen(false);
-      form.reset();
+      form.reset(); // Reset form after successful submission
     } catch (error) {
-      console.error("Error submitting plan form:", error);
-    } finally {
-      setIsLoading(false);
+      console.error("Error submitting form:", error);
+      // You could add error handling here
     }
   };
 
   return (
-    <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[525px]">
         <DialogHeader>
-          <DialogTitle>{plan ? "Edit Plan" : "Create New Plan"}</DialogTitle>
-          <DialogDescription>
-            {plan
-              ? "Update the details for this subscription plan."
-              : "Add a new subscription plan for users."}
-          </DialogDescription>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -121,10 +101,85 @@ export function PlanFormDialog({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Plan Name</FormLabel>
+                  <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Basic, Silver, Gold" {...field} />
+                    <Input placeholder="Premium Plan" {...field} />
                   </FormControl>
+                  <FormDescription>
+                    The name of the subscription plan.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="daily_deposit_limit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Daily Deposit Limit (BDT)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="10000"
+                      {...field}
+                      onChange={(e) =>
+                        field.onChange(parseFloat(e.target.value) || 0)
+                      }
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Maximum amount a user can deposit per day.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="daily_withdrawal_limit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Daily Withdrawal Limit (BDT)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="5000"
+                      {...field}
+                      onChange={(e) =>
+                        field.onChange(parseFloat(e.target.value) || 0)
+                      }
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Maximum amount a user can withdraw per day.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="daily_profit_limit"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Daily Profit Limit (BDT)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="2000"
+                      {...field}
+                      onChange={(e) =>
+                        field.onChange(parseFloat(e.target.value) || 0)
+                      }
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Maximum profit a user can earn per day.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -139,101 +194,38 @@ export function PlanFormDialog({
                   <FormControl>
                     <Input
                       type="number"
-                      placeholder="0"
+                      placeholder="1000"
                       {...field}
                       onChange={(e) =>
-                        field.onChange(parseFloat(e.target.value))
+                        field.onChange(parseFloat(e.target.value) || 0)
                       }
                     />
                   </FormControl>
-                  <FormDescription>Set to 0 for free plans</FormDescription>
+                  <FormDescription>
+                    The cost of the subscription plan.
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <FormField
-                control={form.control}
-                name="daily_deposit_limit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Daily Deposit Limit</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="10000"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(parseFloat(e.target.value))
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="daily_withdrawal_limit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Daily Withdrawal Limit</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="5000"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(parseFloat(e.target.value))
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="daily_profit_limit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Daily Profit Limit</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="1000"
-                        {...field}
-                        onChange={(e) =>
-                          field.onChange(parseFloat(e.target.value))
-                        }
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
             <FormField
               control={form.control}
               name="is_default"
               render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Default Plan</FormLabel>
-                    <FormDescription>
-                      Make this the default plan for new users
-                    </FormDescription>
-                  </div>
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                   <FormControl>
-                    <Switch
+                    <Checkbox
                       checked={field.value}
                       onCheckedChange={field.onChange}
                     />
                   </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Set as Default Plan</FormLabel>
+                    <FormDescription>
+                      New users will be assigned this plan by default
+                    </FormDescription>
+                  </div>
                 </FormItem>
               )}
             />
@@ -242,20 +234,11 @@ export function PlanFormDialog({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-                disabled={isLoading}
+                onClick={() => onOpenChange(false)}
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading
-                  ? plan
-                    ? "Updating..."
-                    : "Creating..."
-                  : plan
-                  ? "Update Plan"
-                  : "Create Plan"}
-              </Button>
+              <Button type="submit">{submitLabel}</Button>
             </DialogFooter>
           </form>
         </Form>

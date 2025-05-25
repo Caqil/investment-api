@@ -1,4 +1,3 @@
-// src/components/layout/footer.tsx
 import React from "react";
 
 export function Footer() {
@@ -9,9 +8,7 @@ export function Footer() {
           &copy; {new Date().getFullYear()} Investment Admin. All rights
           reserved.
         </p>
-        <p className="text-sm text-muted-foreground">
-          Built with Next.js and shadcn/ui
-        </p>
+        <p className="text-sm text-muted-foreground">Version 1.0.0</p>
       </div>
     </footer>
   );

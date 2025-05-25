@@ -5,18 +5,11 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Button } from "../../../components/ui/button";
-import { useAuthStore } from "../../../store/auth-store";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "../../../components/ui/form";
-import { Input } from "../../../components/ui/input";
-import { isAuthenticated } from "../../../lib/auth";
+import { useAuthStore } from "@/store/auth-store";
+import { isAuthenticated } from "@/lib/auth";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 // Form validation schema
 const loginSchema = z.object({

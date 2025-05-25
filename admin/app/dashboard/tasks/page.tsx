@@ -10,10 +10,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { TasksTable } from "@/components/tasks/tasks-table";
-import { TaskFormDialog } from "@/components/tasks/task-form-dialog";
 import { tasksApi } from "@/lib/api";
 import { Task } from "@/types/task";
-import { useToast } from "@/components/ui/use-toast";
 import { PlusIcon } from "lucide-react";
 
 export default function TasksPage() {
