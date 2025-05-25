@@ -1,6 +1,13 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import { ApiResponse, PaginationParams } from '../types/api';
 import { LoginResponse } from '@/types/auth';
+import { DashboardStats } from '@/types/dashboard';
+import { User } from '@/types/user';
+import { Withdrawal } from '@/types/withdrawal';
+import { KYCDocument } from '@/types/kyc';
+import { Plan } from '@/types/plan';
+import { Task } from '@/types/task';
+import { Transaction } from '@/types/transaction';
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -103,46 +110,46 @@ export const authApi = {
 
 // Users
 export const usersApi = {
-  getAll: (params?: PaginationParams) => 
-    get('/admin/users', params),
-  getById: (id: number) => 
-    get(`/admin/users/${id}`),
-  block: (id: number) => 
-    put(`/admin/users/${id}/block`, {}),
-  unblock: (id: number) => 
-    put(`/admin/users/${id}/unblock`, {}),
+  getAll: (params?: PaginationParams): Promise<{ users: User[], total: number }> => 
+    get<{ users: User[], total: number }>('/admin/users', params),
+  getById: (id: number): Promise<User> => 
+    get<User>(`/admin/users/${id}`),
+  block: (id: number): Promise<{ message: string }> => 
+    put<{ message: string }>(`/admin/users/${id}/block`, {}),
+  unblock: (id: number): Promise<{ message: string }> => 
+    put<{ message: string }>(`/admin/users/${id}/unblock`, {}),
 };
 
 // Withdrawals
 export const withdrawalsApi = {
-  getAll: (params?: PaginationParams & { status?: string }) => 
-    get('/admin/withdrawals', params),
-  getById: (id: number) => 
-    get(`/admin/withdrawals/${id}`),
-  approve: (id: number, adminNote: string) => 
-    put(`/admin/withdrawals/${id}/approve`, { admin_note: adminNote }),
-  reject: (id: number, reason: string) => 
-    put(`/admin/withdrawals/${id}/reject`, { reason }),
+  getAll: (params?: PaginationParams & { status?: string }): Promise<{ withdrawals: Withdrawal[], total: number }> => 
+    get<{ withdrawals: Withdrawal[], total: number }>('/admin/withdrawals', params),
+  getById: (id: number): Promise<Withdrawal> => 
+    get<Withdrawal>(`/admin/withdrawals/${id}`),
+  approve: (id: number, adminNote: string): Promise<{ message: string }> => 
+    put<{ message: string }>(`/admin/withdrawals/${id}/approve`, { admin_note: adminNote }),
+  reject: (id: number, reason: string): Promise<{ message: string }> => 
+    put<{ message: string }>(`/admin/withdrawals/${id}/reject`, { reason }),
 };
 
 // KYC
 export const kycApi = {
-  getAll: (params?: PaginationParams & { status?: string }) => 
-    get('/admin/kyc', params),
-  getById: (id: number) => 
-    get(`/admin/kyc/${id}`),
-  approve: (id: number) => 
-    put(`/admin/kyc/${id}/approve`, {}),
-  reject: (id: number, reason: string) => 
-    put(`/admin/kyc/${id}/reject`, { reason }),
+  getAll: (params?: PaginationParams & { status?: string }): Promise<{ kyc_documents: KYCDocument[], total: number }> => 
+    get<{ kyc_documents: KYCDocument[], total: number }>('/admin/kyc', params),
+  getById: (id: number): Promise<KYCDocument> => 
+    get<KYCDocument>(`/admin/kyc/${id}`),
+  approve: (id: number): Promise<{ message: string }> => 
+    put<{ message: string }>(`/admin/kyc/${id}/approve`, {}),
+  reject: (id: number, reason: string): Promise<{ message: string }> => 
+    put<{ message: string }>(`/admin/kyc/${id}/reject`, { reason }),
 };
 
 // Plans
 export const plansApi = {
-  getAll: () => 
-    get('/admin/plans'),
-  getById: (id: number) => 
-    get(`/admin/plans/${id}`),
+  getAll: (): Promise<{ plans: Plan[] }> => 
+    get<{ plans: Plan[] }>('/admin/plans'),
+  getById: (id: number): Promise<Plan> => 
+    get<Plan>(`/admin/plans/${id}`),
   create: (planData: {
     name: string,
     daily_deposit_limit: number,
@@ -150,8 +157,8 @@ export const plansApi = {
     daily_profit_limit: number,
     price: number,
     is_default: boolean
-  }) => 
-    post('/admin/plans', planData),
+  }): Promise<{ message: string, plan: Plan }> => 
+    post<{ message: string, plan: Plan }>('/admin/plans', planData),
   update: (id: number, planData: {
     name: string,
     daily_deposit_limit: number,
@@ -159,56 +166,56 @@ export const plansApi = {
     daily_profit_limit: number,
     price: number,
     is_default: boolean
-  }) => 
-    put(`/admin/plans/${id}`, planData),
-  delete: (id: number) => 
-    del(`/admin/plans/${id}`),
+  }): Promise<{ message: string, plan: Plan }> => 
+    put<{ message: string, plan: Plan }>(`/admin/plans/${id}`, planData),
+  delete: (id: number): Promise<{ message: string }> => 
+    del<{ message: string }>(`/admin/plans/${id}`),
 };
 
 // Tasks
 export const tasksApi = {
-  getAll: () => 
-    get('/admin/tasks'),
-  getById: (id: number) => 
-    get(`/admin/tasks/${id}`),
+  getAll: (): Promise<{ tasks: Task[] }> => 
+    get<{ tasks: Task[] }>('/admin/tasks'),
+  getById: (id: number): Promise<Task> => 
+    get<Task>(`/admin/tasks/${id}`),
   create: (taskData: {
     name: string,
     description: string,
     task_type: string,
     task_url: string,
     is_mandatory: boolean
-  }) => 
-    post('/admin/tasks', taskData),
+  }): Promise<{ message: string, task: Task }> => 
+    post<{ message: string, task: Task }>('/admin/tasks', taskData),
   update: (id: number, taskData: {
     name: string,
     description: string,
     task_type: string,
     task_url: string,
     is_mandatory: boolean
-  }) => 
-    put(`/admin/tasks/${id}`, taskData),
-  delete: (id: number) => 
-    del(`/admin/tasks/${id}`),
+  }): Promise<{ message: string, task: Task }> => 
+    put<{ message: string, task: Task }>(`/admin/tasks/${id}`, taskData),
+  delete: (id: number): Promise<{ message: string }> => 
+    del<{ message: string }>(`/admin/tasks/${id}`),
 };
 
 // Transactions
 export const transactionsApi = {
-  getAll: (params?: PaginationParams & { type?: string }) => 
-    get('/admin/transactions', params),
-  getById: (id: number) => 
-    get(`/admin/transactions/${id}`),
+  getAll: (params?: PaginationParams & { type?: string }): Promise<{ transactions: Transaction[], total: number }> => 
+    get<{ transactions: Transaction[], total: number }>('/admin/transactions', params),
+  getById: (id: number): Promise<Transaction> => 
+    get<Transaction>(`/admin/transactions/${id}`),
 };
 
 // Notifications
 export const notificationsApi = {
-  send: (data: { title: string, message: string }) => 
-    post('/admin/notifications', data),
+  send: (data: { title: string, message: string }): Promise<{ message: string }> => 
+    post<{ message: string }>('/admin/notifications', data),
 };
 
 // Dashboard stats
 export const dashboardApi = {
-  getStats: () => 
-    get('/admin/dashboard/stats'),
+  getStats: (): Promise<DashboardStats> => 
+    get<DashboardStats>('/admin/dashboard/stats'),
 };
 
 export { apiClient, get, post, put, del };
