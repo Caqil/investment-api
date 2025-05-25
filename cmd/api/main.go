@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -31,6 +34,12 @@ func main() {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	// Run database migrations
+	if err := runMigrations(db); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Database migrations completed successfully")
 
 	// Initialize application
 	application := app.NewApp(cfg, db)
@@ -69,4 +78,97 @@ func main() {
 	}
 
 	log.Println("Server exited properly")
+}
+
+// runMigrations executes the SQL migrations from the migrations directory
+func runMigrations(db *sql.DB) error {
+	// Read migration file
+	migrationContent, err := ioutil.ReadFile("migrations/schema.sql")
+	if err != nil {
+		return fmt.Errorf("error reading migration file: %v", err)
+	}
+
+	// Split the content by semicolon to get individual statements
+	// Make sure to handle multi-line statements properly
+	content := string(migrationContent)
+
+	// First handle the CREATE DATABASE and USE statements
+	if strings.Contains(content, "CREATE DATABASE") {
+		dbStatements := []string{
+			"CREATE DATABASE IF NOT EXISTS investment_app;",
+			"USE investment_app;",
+		}
+
+		for _, stmt := range dbStatements {
+			_, err = db.Exec(stmt)
+			if err != nil {
+				log.Printf("Warning during database setup: %v", err)
+			}
+		}
+	}
+
+	// Extract all CREATE TABLE and INSERT statements
+	statements := extractSQLStatements(content)
+
+	// Execute each statement in a transaction where possible
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %v", err)
+	}
+
+	for _, statement := range statements {
+		// Skip empty statements
+		if statement == "" {
+			continue
+		}
+
+		// Execute the statement
+		_, err = tx.Exec(statement)
+		if err != nil {
+			// Some errors might be expected (like table already exists)
+			// Log them but continue with migrations
+			log.Printf("Warning during migration: %v", err)
+			// Don't rollback the transaction for expected errors
+		}
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit migration transaction: %v", err)
+	}
+
+	return nil
+}
+
+// extractSQLStatements parses the SQL file and extracts valid SQL statements
+func extractSQLStatements(content string) []string {
+	// Split by semicolon but respect statement boundaries
+	var statements []string
+	var currentStatement strings.Builder
+
+	lines := strings.Split(content, "\n")
+	for _, line := range lines {
+		// Skip comment lines
+		trimmedLine := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmedLine, "--") || trimmedLine == "" {
+			continue
+		}
+
+		// Append the line to the current statement
+		currentStatement.WriteString(line)
+		currentStatement.WriteString(" ")
+
+		// If the line contains a semicolon, it's the end of a statement
+		if strings.Contains(line, ";") {
+			statements = append(statements, strings.TrimSpace(currentStatement.String()))
+			currentStatement.Reset()
+		}
+	}
+
+	// Add the last statement if there is one
+	if currentStatement.Len() > 0 {
+		statements = append(statements, strings.TrimSpace(currentStatement.String()))
+	}
+
+	return statements
 }

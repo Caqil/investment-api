@@ -12,7 +12,6 @@ import (
 	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/Caqil/investment-api/internal/service"
 	"github.com/Caqil/investment-api/pkg/database"
-	"github.com/Caqil/investment-api/pkg/utils"
 	"github.com/joho/godotenv"
 )
 
@@ -35,9 +34,9 @@ func main() {
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
 	transactionRepo := repository.NewTransactionRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
 
-	// Initialize services
-	emailService := utils.NewEmailService(cfg.Email)
+	// Initialize bonus service
 	bonusService := service.NewBonusService(
 		userRepo,
 		transactionRepo,
@@ -52,9 +51,8 @@ func main() {
 		},
 	)
 
-	// Initialize notification service for sending notifications
-	notificationRepo := repository.NewNotificationRepository(db)
-	notificationService := service.NewNotificationService(notificationRepo, emailService)
+	// Set the notification repository in the bonus service
+	bonusService.SetNotificationRepo(notificationRepo)
 
 	// Set up scheduled tasks
 	cronManager := cron.NewCronManager(bonusService)
@@ -78,6 +76,7 @@ func main() {
 func addDailyBonusJob(db *sql.DB, cfg *config.Config) {
 	userRepo := repository.NewUserRepository(db)
 	transactionRepo := repository.NewTransactionRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
 
 	bonusService := service.NewBonusService(
 		userRepo,
@@ -92,6 +91,9 @@ func addDailyBonusJob(db *sql.DB, cfg *config.Config) {
 			ReferralProfitPercentage: cfg.App.ReferralProfitPercentage,
 		},
 	)
+
+	// Set the notification repository in the bonus service
+	bonusService.SetNotificationRepo(notificationRepo)
 
 	log.Println("Starting manual daily bonus calculation...")
 	err := bonusService.CalculateDailyBonusForAllUsers()

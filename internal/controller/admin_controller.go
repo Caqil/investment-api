@@ -16,6 +16,7 @@ type AdminController struct {
 	planService         *service.PlanService
 	taskService         *service.TaskService
 	notificationService *service.NotificationService
+	bonusService        *service.BonusService // Add this field
 }
 
 func NewAdminController(
@@ -25,6 +26,7 @@ func NewAdminController(
 	planService *service.PlanService,
 	taskService *service.TaskService,
 	notificationService *service.NotificationService,
+	bonusService *service.BonusService, // Add parameter
 ) *AdminController {
 	return &AdminController{
 		userService:         userService,
@@ -33,6 +35,7 @@ func NewAdminController(
 		planService:         planService,
 		taskService:         taskService,
 		notificationService: notificationService,
+		bonusService:        bonusService, // Assign field
 	}
 }
 

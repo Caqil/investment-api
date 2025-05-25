@@ -2,7 +2,20 @@
 CREATE DATABASE IF NOT EXISTS investment_app;
 USE investment_app;
 
--- Users table
+-- Plans table (no dependencies)
+CREATE TABLE IF NOT EXISTS plans (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    daily_deposit_limit DECIMAL(15,2) NOT NULL,
+    daily_withdrawal_limit DECIMAL(15,2) NOT NULL,
+    daily_profit_limit DECIMAL(15,2) NOT NULL,
+    price DECIMAL(15,2) NOT NULL,
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Users table (depends on plans)
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -11,7 +24,7 @@ CREATE TABLE IF NOT EXISTS users (
     phone VARCHAR(20),
     balance DECIMAL(15,2) DEFAULT 0,
     referral_code VARCHAR(10) UNIQUE NOT NULL,
-    referred_by BIGINT,
+    referred_by BIGINT NULL,
     plan_id BIGINT NOT NULL,
     is_kyc_verified BOOLEAN DEFAULT FALSE,
     email_verified BOOLEAN DEFAULT FALSE,
@@ -25,20 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
     FOREIGN KEY (plan_id) REFERENCES plans(id)
 );
 
--- Plans table
-CREATE TABLE IF NOT EXISTS plans (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) NOT NULL,
-    daily_deposit_limit DECIMAL(15,2) NOT NULL,
-    daily_withdrawal_limit DECIMAL(15,2) NOT NULL,
-    daily_profit_limit DECIMAL(15,2) NOT NULL,
-    price DECIMAL(15,2) NOT NULL,
-    is_default BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Transactions table
+-- Transactions table (depends on users)
 CREATE TABLE IF NOT EXISTS transactions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Payments table
+-- Payments table (depends on transactions)
 CREATE TABLE IF NOT EXISTS payments (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     transaction_id BIGINT NOT NULL,
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS payments (
     FOREIGN KEY (transaction_id) REFERENCES transactions(id)
 );
 
--- Withdrawals table
+-- Withdrawals table (depends on transactions and users)
 CREATE TABLE IF NOT EXISTS withdrawals (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     transaction_id BIGINT NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS withdrawals (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Tasks table
+-- Tasks table (no dependencies)
 CREATE TABLE IF NOT EXISTS tasks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
@@ -96,13 +96,13 @@ CREATE TABLE IF NOT EXISTS tasks (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- User Tasks table
+-- User Tasks table (depends on users and tasks)
 CREATE TABLE IF NOT EXISTS user_tasks (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     task_id BIGINT NOT NULL,
     is_completed BOOLEAN DEFAULT FALSE,
-    completed_at TIMESTAMP,
+    completed_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, task_id),
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS user_tasks (
     FOREIGN KEY (task_id) REFERENCES tasks(id)
 );
 
--- KYC Documents table
+-- KYC Documents table (depends on users)
 CREATE TABLE IF NOT EXISTS kyc_documents (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -125,14 +125,14 @@ CREATE TABLE IF NOT EXISTS kyc_documents (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Devices table
+-- Devices table (depends on users)
 CREATE TABLE IF NOT EXISTS devices (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
     device_id VARCHAR(255) NOT NULL,
     device_name VARCHAR(100),
     device_model VARCHAR(100),
-    last_login TIMESTAMP,
+    last_login TIMESTAMP NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS devices (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Notifications table
+-- Notifications table (depends on users)
 CREATE TABLE IF NOT EXISTS notifications (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -153,7 +153,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Support Tickets table
+-- Support Tickets table (depends on users)
 CREATE TABLE IF NOT EXISTS support_tickets (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -165,7 +165,7 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
--- Support Messages table
+-- Support Messages table (depends on support_tickets)
 CREATE TABLE IF NOT EXISTS support_messages (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     ticket_id BIGINT NOT NULL,
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS support_messages (
     FOREIGN KEY (ticket_id) REFERENCES support_tickets(id)
 );
 
--- News table
+-- News table (no dependencies)
 CREATE TABLE IF NOT EXISTS news (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     title VARCHAR(100) NOT NULL,
@@ -187,7 +187,7 @@ CREATE TABLE IF NOT EXISTS news (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- FAQs table
+-- FAQs table (no dependencies)
 CREATE TABLE IF NOT EXISTS faqs (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     question TEXT NOT NULL,

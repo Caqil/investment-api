@@ -105,6 +105,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 		planService,
 		taskService,
 		notificationService,
+		bonusService, // Add this parameter
 	)
 
 	// Initialize middleware
