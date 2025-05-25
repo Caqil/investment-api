@@ -140,8 +140,6 @@ func (c *AuthController) Register(ctx *gin.Context) {
 		"user":    userResponse,
 	})
 }
-
-// Login handles user authentication
 func (c *AuthController) Login(ctx *gin.Context) {
 	var req LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -156,21 +154,39 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	// Check if device is registered to this user
-	isUserDevice, err := c.deviceService.IsDeviceRegisteredToUser(req.DeviceID, user.ID)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check device"})
-		return
-	}
-	if !isUserDevice {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Device not registered to this user"})
-		return
-	}
+	// If user is admin, skip device check
+	if user.IsAdmin {
+		// Admin users can login from any device
+		// Update last login time if device ID is provided
+		if req.DeviceID != "" {
+			// Check if device is registered, register it if it's not
+			isUserDevice, err := c.deviceService.IsDeviceRegisteredToUser(req.DeviceID, user.ID)
+			if err == nil && !isUserDevice {
+				// Silently register the device for the admin
+				_ = c.deviceService.RegisterDevice(user.ID, req.DeviceID)
+			}
 
-	// Update device last login
-	err = c.deviceService.UpdateDeviceLastLogin(req.DeviceID)
-	if err != nil {
-		// Log error but continue
+			// Update device last login if provided
+			_ = c.deviceService.UpdateDeviceLastLogin(req.DeviceID)
+		}
+	} else {
+		// Regular users must use registered devices
+		// Check if device is registered to this user
+		isUserDevice, err := c.deviceService.IsDeviceRegisteredToUser(req.DeviceID, user.ID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check device"})
+			return
+		}
+		if !isUserDevice {
+			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Device not registered to this user"})
+			return
+		}
+
+		// Update device last login
+		err = c.deviceService.UpdateDeviceLastLogin(req.DeviceID)
+		if err != nil {
+			// Log error but continue
+		}
 	}
 
 	// Create response
@@ -182,6 +198,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		"balance":           user.Balance,
 		"referral_code":     user.ReferralCode,
 		"is_kyc_verified":   user.IsKYCVerified,
+		"is_admin":          user.IsAdmin,
 		"biometric_enabled": user.BiometricEnabled,
 		"profile_pic_url":   user.ProfilePicURL,
 	}

@@ -1,12 +1,7 @@
 package app
 
 import (
-	"log"
-	"net/http"
-	"os"
-
 	"github.com/Caqil/investment-api/config"
-	"github.com/Caqil/investment-api/internal/admin"
 	"github.com/Caqil/investment-api/internal/controller"
 	"github.com/Caqil/investment-api/internal/middleware"
 	"github.com/Caqil/investment-api/internal/repository"
@@ -14,14 +9,12 @@ import (
 	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/Caqil/investment-api/pkg/utils"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/sessions"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 )
 
 type App struct {
 	config     *config.Config
-	mongoConn  *database.MongoDBConnection // Make sure this field exists
+	mongoConn  *database.MongoDBConnection
 	jwtService *service.JWTService
 }
 
@@ -38,22 +31,6 @@ func (a *App) SetupRoutes() *gin.Engine {
 	// gin.SetMode(gin.ReleaseMode)
 
 	r := gin.Default()
-
-	if _, err := os.Stat("templates"); os.IsNotExist(err) {
-		// Create the templates directory if it doesn't exist
-		err = os.MkdirAll("templates/admin", 0755)
-		if err != nil {
-			log.Printf("Warning: Failed to create templates directory: %v", err)
-		}
-	}
-
-	// Serve static files
-	r.Static("/static", "./public/static")
-	r.Static("/admin/assets", "./public/admin")
-
-	// Set up session middleware
-	store := cookie.NewStore([]byte(a.config.JWT.Secret))
-	r.Use(sessions.Sessions("investment_app_session", store))
 
 	// CORS configuration
 	r.Use(cors.New(cors.Config{
@@ -97,13 +74,12 @@ func (a *App) SetupRoutes() *gin.Engine {
 		},
 	)
 	taskService := service.NewTaskService(taskRepo, a.mongoConn)
-
 	withdrawalService := service.NewWithdrawalService(
 		withdrawalRepo,
 		transactionRepo,
 		userRepo,
 		taskService,
-		a.mongoConn, // Use a.mongoConn here
+		a.mongoConn,
 		struct {
 			MinimumWithdrawalAmount float64
 		}{
@@ -136,10 +112,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 	authMiddleware := middleware.NewAuthMiddleware(a.jwtService.GetJWTManager(), userRepo)
 	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService)
 	adminMiddleware := middleware.NewAdminMiddleware(userRepo)
-	r.GET("/admin", func(c *gin.Context) {
-		// Redirect to the dashboard route that will be handled by AdminSetup
-		c.Redirect(http.StatusFound, "/admin/dashboard")
-	})
+
 	// Public routes
 	api := r.Group("/api")
 	{
@@ -153,7 +126,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 		}
 
 		// Callback routes for payment gateways
-		api.GET("/payments/callback/:gateway", paymentController.HandleCallback)
+		api.POST("/payments/callback/:gateway", paymentController.HandleCallback)
 	}
 
 	// Protected routes
@@ -251,26 +224,6 @@ func (a *App) SetupRoutes() *gin.Engine {
 		// Admin notification management
 		adminAPI.POST("/notifications", adminController.SendNotification)
 	}
-
-	// Initialize admin components with factory
-	adminFactory := admin.NewFactory(a.mongoConn, a.config, a.jwtService.GetJWTManager())
-
-	// Create admin components
-	adminSetup := adminFactory.CreateAdminSetup()
-	adminAuthController := adminFactory.CreateAdminAuthController()
-	dashboardController := adminFactory.CreateDashboardController()
-
-	// Create admin service
-	adminService := service.NewAdminService(
-		a.mongoConn,
-		a.config,
-		adminSetup,
-		adminAuthController,
-		dashboardController,
-	)
-
-	// Set up admin routes
-	adminService.SetupAdminRoutes(r)
 
 	return r
 }
