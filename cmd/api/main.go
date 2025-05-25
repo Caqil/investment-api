@@ -45,6 +45,9 @@ func main() {
 	application := app.NewApp(cfg, db)
 	router := application.SetupRoutes()
 
+	// Ensure directories exist
+	ensureDirectoriesExist()
+
 	// Configure server
 	server := &http.Server{
 		Addr:         fmt.Sprintf(":%s", cfg.Server.Port),
@@ -57,6 +60,7 @@ func main() {
 	// Start server in a goroutine
 	go func() {
 		log.Printf("Server starting on port %s", cfg.Server.Port)
+		log.Printf("Admin interface available at http://localhost:%s/admin", cfg.Server.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Failed to start server: %v", err)
 		}
@@ -171,4 +175,29 @@ func extractSQLStatements(content string) []string {
 	}
 
 	return statements
+}
+
+// ensureDirectoriesExist makes sure all required directories exist
+func ensureDirectoriesExist() {
+	// List of directories to ensure
+	dirs := []string{
+		"public",
+		"public/admin",
+		"public/admin/css",
+		"public/admin/js",
+		"public/admin/images",
+		"public/static",
+		"templates",
+		"templates/admin",
+	}
+
+	// Create directories if they don't exist
+	for _, dir := range dirs {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				log.Printf("Warning: Failed to create directory %s: %v", dir, err)
+			}
+		}
+	}
 }

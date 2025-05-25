@@ -6,24 +6,26 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/providers/auth-provider";
 
 export default function Home() {
-  const { user, isAdmin, isLoading } = useAuth();
   const router = useRouter();
+  const { user, isAdmin, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
-      if (!user) {
-        router.push("/login");
-      } else if (isAdmin) {
-        router.push("/admin/dashboard");
+      if (user) {
+        if (isAdmin) {
+          router.push("/admin/dashboard");
+        } else {
+          router.push("/user/dashboard");
+        }
       } else {
-        router.push("/user/dashboard");
+        router.push("/login");
       }
     }
   }, [user, isAdmin, isLoading, router]);
 
   return (
-    <div className="flex h-screen items-center justify-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-primary"></div>
     </div>
   );
 }

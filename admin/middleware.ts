@@ -2,75 +2,84 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+// Paths that don't require authentication
+const publicPaths = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+  '/verify-email',
+  '/api/auth/login',
+  '/api/auth/register',
+];
+
+// Check if the path is public
+const isPublicPath = (path: string) => {
+  return publicPaths.some(publicPath => path.startsWith(publicPath));
+};
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
-  // Skip middleware for static files and API routes
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.startsWith('/static') ||
-    pathname.includes('.')
-  ) {
+  const token = request.cookies.get('token')?.value;
+
+  // Don't redirect API routes
+  if (pathname.startsWith('/api/')) {
     return NextResponse.next();
   }
-  
-  // Get auth token
-  const token = request.cookies.get('auth_token')?.value;
-  const isAdmin = request.cookies.get('user_is_admin')?.value === 'true';
-  
-  // Public routes that don't require authentication
-  const publicRoutes = [
-    '/login',
-    '/register',
-    '/verify-email',
-    '/forgot-password',
-    '/reset-password'
-  ];
-  
-  const isPublicRoute = publicRoutes.some(route => 
-    pathname === route || pathname.startsWith(`${route}/`)
-  );
-  
-  // Handle public routes
-  if (isPublicRoute) {
-    // If user is already logged in, redirect to dashboard
+
+  // For public paths, redirect to dashboard if already logged in
+  if (isPublicPath(pathname)) {
     if (token) {
-      const destination = isAdmin ? '/admin/dashboard' : '/user/dashboard';
-      return NextResponse.redirect(new URL(destination, request.url));
+      // Check if the token contains admin claim
+      const isAdmin = false; // In a real app, you would decode the token and check
+      
+      // If token exists, redirect to appropriate dashboard
+      const url = request.nextUrl.clone();
+      url.pathname = isAdmin ? '/admin/dashboard' : '/user/dashboard';
+      return NextResponse.redirect(url);
     }
+    
+    // Allow access to public paths if not logged in
     return NextResponse.next();
   }
-  
-  // Root path redirect
-  if (pathname === '/') {
-    if (!token) {
-      return NextResponse.redirect(new URL('/login', request.url));
-    }
-    const destination = isAdmin ? '/admin/dashboard' : '/user/dashboard';
-    return NextResponse.redirect(new URL(destination, request.url));
-  }
-  
-  // Require authentication for all other routes
+
+  // For protected paths, redirect to login if not logged in
   if (!token) {
-    // Save the original URL to redirect back after login
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', encodeURIComponent(pathname));
-    return NextResponse.redirect(loginUrl);
+    const url = request.nextUrl.clone();
+    url.pathname = '/login';
+    
+    // Store the original URL to redirect back after login
+    url.searchParams.set('callbackUrl', request.nextUrl.pathname);
+    return NextResponse.redirect(url);
   }
-  
-  // Role-based access control
-  if (pathname.startsWith('/admin') && !isAdmin) {
-    return NextResponse.redirect(new URL('/user/dashboard', request.url));
+
+  // Handle admin routes - ensure only admins can access
+  if (pathname.startsWith('/admin/')) {
+    // In a real implementation, you would decode the JWT to check if user is admin
+    // This is just a placeholder example
+    const isAdmin = false; // Should be determined from the token
+    
+    if (!isAdmin) {
+      const url = request.nextUrl.clone();
+      url.pathname = '/user/dashboard';
+      return NextResponse.redirect(url);
+    }
   }
-  
-  if (pathname.startsWith('/user') && isAdmin) {
-    return NextResponse.redirect(new URL('/admin/dashboard', request.url));
-  }
-  
+
+  // Allow access to protected routes if logged in
   return NextResponse.next();
 }
 
+// Configure middleware to run on specific paths
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    /*
+     * Match all request paths except:
+     * 1. /_next (Next.js internals)
+     * 2. /static (static files)
+     * 3. /favicon.ico, /robots.txt (common static files)
+     * 4. /images, /fonts (static assets)
+     */
+    '/((?!_next|static|favicon.ico|robots.txt|images|fonts).*)',
+  ],
 };

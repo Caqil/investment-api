@@ -1,8 +1,17 @@
 // app/layout.tsx
-import { AuthProvider } from "@/providers/auth-provider";
-import { Toaster } from "@/components/ui/sonner";
-import "./globals.css";
+import React from "react";
+import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
 import { ThemeProvider } from "@/providers/theme-provider";
+import { AuthProvider } from "@/providers/auth-provider";
+import "./globals.css";
+
+const inter = Inter({ subsets: ["latin"] });
+
+export const metadata = {
+  title: "Investment App",
+  description: "Secure your future with smart investments",
+};
 
 export default function RootLayout({
   children,
@@ -10,8 +19,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
@@ -20,7 +29,7 @@ export default function RootLayout({
         >
           <AuthProvider>
             {children}
-            <Toaster />
+            <Toaster position="top-right" />
           </AuthProvider>
         </ThemeProvider>
       </body>

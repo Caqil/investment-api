@@ -90,7 +90,19 @@ export function debounce<T extends (...args: any[]) => any>(
     timeout = setTimeout(() => func(...args), wait);
   };
 }
-
+export function generateDeviceId(): string {
+  // Create a random string
+  const randomPart = Math.random().toString(36).substring(2, 15);
+  // Add timestamp for uniqueness
+  const timestamp = Date.now().toString(36);
+  // Combine with some browser fingerprinting if available
+  const browserInfo = 
+    typeof window !== 'undefined' 
+      ? `${window.navigator.userAgent.replace(/\D+/g, '')}`
+      : '';
+  
+  return `${randomPart}-${timestamp}-${browserInfo.substring(0, 10)}`;
+}
 // Throttle function
 export function throttle<T extends (...args: any[]) => any>(
   func: T, 

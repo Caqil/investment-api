@@ -1,246 +1,229 @@
 // providers/auth-provider.tsx
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { User } from "@/types/user";
-import { api } from "@/lib/auth";
+import React, { createContext, useContext, useState, useEffect } from "react";
+import axios from "axios";
 
+// Define the base URL for API requests
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080/api";
+
+// Create axios instance
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    "Content-Type": "application/json",
+  },
+});
+
+// Add request interceptor to include authorization header
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    // Add device ID header if available
+    const deviceId = localStorage.getItem("device_id");
+    if (deviceId) {
+      config.headers["X-Device-ID"] = deviceId;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Define User type
+type User = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  balance: number;
+  referral_code: string;
+  is_kyc_verified: boolean;
+  email_verified: boolean;
+  is_admin?: boolean;
+  biometric_enabled: boolean;
+  profile_pic_url: string;
+  created_at: string;
+  plan_id: number;
+};
+
+// Define AuthContext type
 interface AuthContextType {
   user: User | null;
-  isAdmin: boolean;
   isLoading: boolean;
-  error: string | null;
-  login: (email: string, password: string, deviceId: string) => Promise<void>;
+  isAdmin: boolean;
+  token: string | null;
+  login: (credentials: {
+    email: string;
+    password: string;
+    device_id: string;
+  }) => Promise<User | undefined>;
+  register: (userData: any) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
-  register: (userData: any) => Promise<void>;
-  verifyEmail: (email: string, code: string) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
-  resetPassword: (
-    email: string,
-    token: string,
-    password: string
-  ) => Promise<void>;
-  updateUser: (user: User) => void;
+  updateUser: (userData: Partial<User>) => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create the context with properly typed default values
+const AuthContext = createContext<AuthContextType>({
+  user: null,
+  isLoading: true,
+  isAdmin: false,
+  token: null,
+  login: async () => undefined,
+  register: async () => ({ success: false, message: "" }),
+  logout: () => {},
+  updateUser: () => {},
+});
 
+// Auth provider component
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
+  const [token, setToken] = useState<string | null>(null);
 
-  // Check authentication status on mount
+  // Check if user is admin
+  const isAdmin = user?.is_admin || false;
+
+  // Initialize auth state from localStorage
   useEffect(() => {
-    const checkAuth = () => {
+    const initAuth = async () => {
       try {
-        const token = localStorage.getItem("auth_token");
-        if (!token) {
-          setUser(null);
-          setIsAdmin(false);
-          setIsLoading(false);
-          return;
-        }
+        const storedToken = localStorage.getItem("token");
+        if (storedToken) {
+          setToken(storedToken);
 
-        // Get user data from localStorage
-        const userData = localStorage.getItem("user_data");
-        if (userData) {
-          const parsedUser = JSON.parse(userData);
-          setUser(parsedUser);
-          setIsAdmin(!!parsedUser.is_admin);
+          // Fetch current user data from API
+          try {
+            const response = await api.get("/user/profile");
+            if (response.data && response.data.user) {
+              setUser(response.data.user);
+            }
+          } catch (profileError) {
+            console.error("Error fetching user profile:", profileError);
+            // Clear invalid token
+            localStorage.removeItem("token");
+            setToken(null);
+          }
         }
       } catch (error) {
-        console.error("Auth check error:", error);
-        // Clear potentially corrupted data
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("user_data");
-        setUser(null);
-        setIsAdmin(false);
+        console.error("Error initializing auth:", error);
+        // Clear invalid token
+        localStorage.removeItem("token");
+        setToken(null);
       } finally {
         setIsLoading(false);
       }
     };
 
-    checkAuth();
+    initAuth();
   }, []);
+  const generateDeviceId = () => {
+    const deviceId = "web_" + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem("device_id", deviceId);
+    return deviceId;
+  };
 
-  const login = async (email: string, password: string, deviceId: string) => {
+  const login = async (credentials: {
+    email: string;
+    password: string;
+    device_id: string;
+  }) => {
     setIsLoading(true);
-    setError(null);
-
     try {
-      const response = await api.post("/auth/login", {
-        email,
-        password,
-        device_id: deviceId,
-      });
+      // Try login first
+      try {
+        const deviceId =
+          localStorage.getItem("device_id") || generateDeviceId();
+        const response = await api.post("/auth/login", credentials);
 
-      // Store auth token
-      const token = response.data.token;
-      localStorage.setItem("auth_token", token);
+        if (response.data && response.data.token && response.data.user) {
+          const receivedToken = response.data.token;
+          const userData = response.data.user;
 
-      // Store user data
-      const userData = response.data.user;
-      localStorage.setItem("user_data", JSON.stringify(userData));
+          // Save to localStorage
+          localStorage.setItem("token", receivedToken);
+          localStorage.setItem("device_id", credentials.device_id);
 
-      // Update state
-      setUser(userData);
-      setIsAdmin(!!userData.is_admin);
+          setToken(receivedToken);
+          setUser(userData);
 
-      // Set cookies for middleware
-      document.cookie = `auth_token=${token}; path=/; max-age=${
-        60 * 60 * 24 * 7
-      }`;
-      document.cookie = `user_is_admin=${
-        userData.is_admin ? "true" : "false"
-      }; path=/; max-age=${60 * 60 * 24 * 7}`;
-
-      // Redirect based on role
-      if (userData.is_admin) {
-        router.push("/admin/dashboard");
-      } else {
-        router.push("/user/dashboard");
+          return userData;
+        }
+      } catch (error) {
+        // If login fails with 401 and the error message indicates device not registered,
+        // we could try registration, but this isn't recommended in production
+        console.error("Login failed:", error);
+        throw error;
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Login error:", error);
-      setError(
-        error.response?.data?.error ||
-          "Login failed. Please check your credentials."
-      );
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const logout = () => {
-    // Clear local storage
-    localStorage.removeItem("auth_token");
-    localStorage.removeItem("user_data");
-
-    // Clear cookies
-    document.cookie =
-      "auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-    document.cookie =
-      "user_is_admin=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;";
-
-    // Reset state
-    setUser(null);
-    setIsAdmin(false);
-
-    // Redirect to login
-    router.push("/login");
-  };
-
+  // Register function that uses the real API
   const register = async (userData: any) => {
     setIsLoading(true);
-    setError(null);
-
     try {
-      await api.post("/auth/register", userData);
-      router.push(`/verify-email?email=${encodeURIComponent(userData.email)}`);
-    } catch (error: any) {
+      const response = await api.post("/auth/register", userData);
+
+      if (response.data) {
+        return {
+          success: true,
+          message: response.data.message || "Registration successful",
+        };
+      } else {
+        throw new Error("Invalid response from server");
+      }
+    } catch (error) {
       console.error("Registration error:", error);
-      setError(
-        error.response?.data?.error || "Registration failed. Please try again."
-      );
       throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const verifyEmail = async (email: string, code: string) => {
-    setIsLoading(true);
-    setError(null);
+  // Logout function
+  const logout = () => {
+    localStorage.removeItem("token");
+    setToken(null);
+    setUser(null);
+  };
 
-    try {
-      await api.post("/auth/verify-email", { email, code });
-      router.push("/login");
-    } catch (error: any) {
-      console.error("Email verification error:", error);
-      setError(
-        error.response?.data?.error || "Verification failed. Please try again."
-      );
-      throw error;
-    } finally {
-      setIsLoading(false);
+  // Update user data
+  const updateUser = (userData: Partial<User>) => {
+    if (user) {
+      const updatedUser = { ...user, ...userData };
+      setUser(updatedUser);
     }
   };
 
-  const forgotPassword = async (email: string) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await api.post("/auth/forgot-password", { email });
-    } catch (error: any) {
-      console.error("Forgot password error:", error);
-      setError(
-        error.response?.data?.error ||
-          "Failed to send reset link. Please try again."
-      );
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const resetPassword = async (
-    email: string,
-    token: string,
-    password: string
-  ) => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      await api.post("/auth/reset-password", {
-        email,
-        token,
-        new_password: password,
-      });
-      router.push("/login");
-    } catch (error: any) {
-      console.error("Reset password error:", error);
-      setError(
-        error.response?.data?.error ||
-          "Password reset failed. Please try again."
-      );
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const updateUser = (updatedUser: User) => {
-    setUser(updatedUser);
-    localStorage.setItem("user_data", JSON.stringify(updatedUser));
-  };
-
-  const value = {
+  // Context value
+  const contextValue: AuthContextType = {
     user,
-    isAdmin,
     isLoading,
-    error,
+    isAdmin,
+    token,
     login,
-    logout,
     register,
-    verifyEmail,
-    forgotPassword,
-    resetPassword,
+    logout,
     updateUser,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
+  );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
-}
+// Custom hook to use the auth context
+export const useAuth = () => useContext(AuthContext);
+
+// Export the API instance for use in other parts of the app
+export { api };
