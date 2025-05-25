@@ -1,0 +1,197 @@
+{{define "reports/transactions"}}
+<div class="qor-page__body">
+  <div class="qor-section">
+    <div class="qor-section__header">
+      <h4>Transaction Summary Report</h4>
+    </div>
+    
+    <!-- Date Range Selector -->
+    <div class="qor-section__body">
+      <form method="GET" action="/admin/reports/transactions" class="qor-form">
+        <div class="qor-form__row">
+          <div class="qor-field">
+            <label class="qor-field__label">Start Date</label>
+            <div class="qor-field__edit">
+              <input type="date" name="start_date" value="{{.StartDate}}" class="qor-field__input">
+            </div>
+          </div>
+          
+          <div class="qor-field">
+            <label class="qor-field__label">End Date</label>
+            <div class="qor-field__edit">
+              <input type="date" name="end_date" value="{{.EndDate}}" class="qor-field__input">
+            </div>
+          </div>
+          
+          <div class="qor-field">
+            <button type="submit" class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect">Apply</button>
+          </div>
+        </div>
+      </form>
+    </div>
+    
+    <div class="qor-section__body">
+      <!-- Transaction Type Chart -->
+      <div class="row">
+        <div class="col-md-6">
+          <div class="panel">
+            <div class="panel-heading">
+              <h5>Transactions by Type</h5>
+            </div>
+            <div class="panel-body">
+              <canvas id="transactionTypeChart" width="400" height="400"></canvas>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="panel">
+            <div class="panel-heading">
+              <h5>Transactions by Status</h5>
+            </div>
+            <div class="panel-body">
+              <canvas id="transactionStatusChart" width="400" height="400"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <br>
+      
+      <!-- Transaction Summary Tables -->
+      <div class="row">
+        <div class="col-md-6">
+          <div class="panel">
+            <div class="panel-heading">
+              <h5>Summary by Transaction Type</h5>
+            </div>
+            <div class="panel-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Count</th>
+                    <th>Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{range .TransactionSummary}}
+                  <tr>
+                    <td>{{.Type}}</td>
+                    <td>{{.Count}}</td>
+                    <td>{{.Total}} BDT</td>
+                  </tr>
+                  {{end}}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-6">
+          <div class="panel">
+            <div class="panel-heading">
+              <h5>Summary by Status</h5>
+            </div>
+            <div class="panel-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Status</th>
+                    <th>Count</th>
+                    <th>Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{range .StatusSummary}}
+                  <tr>
+                    <td>{{.Status}}</td>
+                    <td>{{.Count}}</td>
+                    <td>{{.Total}} BDT</td>
+                  </tr>
+                  {{end}}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Prepare data for transaction type chart
+  var typeLabels = [{{range .TransactionSummary}}"{{.Type}}",{{end}}];
+  var typeCounts = [{{range .TransactionSummary}}{{.Count}},{{end}}];
+  var typeAmounts = [{{range .TransactionSummary}}{{.Total}},{{end}}];
+  
+  // Prepare data for transaction status chart
+  var statusLabels = [{{range .StatusSummary}}"{{.Status}}",{{end}}];
+  var statusCounts = [{{range .StatusSummary}}{{.Count}},{{end}}];
+  
+  // Create transaction type chart
+  var typeCtx = document.getElementById('transactionTypeChart').getContext('2d');
+  var typeChart = new Chart(typeCtx, {
+    type: 'pie',
+    data: {
+      labels: typeLabels,
+      datasets: [{
+        data: typeAmounts,
+        backgroundColor: [
+          'rgba(255, 99, 132, 0.7)',
+          'rgba(54, 162, 235, 0.7)',
+          'rgba(255, 206, 86, 0.7)',
+          'rgba(75, 192, 192, 0.7)',
+          'rgba(153, 102, 255, 0.7)',
+          'rgba(255, 159, 64, 0.7)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+        },
+        title: {
+          display: true,
+          text: 'Transaction Amounts by Type'
+        }
+      }
+    }
+  });
+  
+  // Create transaction status chart
+  var statusCtx = document.getElementById('transactionStatusChart').getContext('2d');
+  var statusChart = new Chart(statusCtx, {
+    type: 'doughnut',
+    data: {
+      labels: statusLabels,
+      datasets: [{
+        data: statusCounts,
+        backgroundColor: [
+          'rgba(255, 206, 86, 0.7)',
+          'rgba(75, 192, 192, 0.7)',
+          'rgba(255, 99, 132, 0.7)'
+        ],
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: {
+          position: 'bottom',
+        },
+        title: {
+          display: true,
+          text: 'Transaction Count by Status'
+        }
+      }
+    }
+  });
+</script>
+{{end}}

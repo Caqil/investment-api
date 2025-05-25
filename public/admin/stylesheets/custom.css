@@ -1,0 +1,147 @@
+/* Custom Admin Styles */
+
+/* Dashboard cards */
+.panel {
+    margin-bottom: 20px;
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .panel-heading {
+    padding: 10px 15px;
+    border-bottom: 1px solid #ddd;
+    border-top-left-radius: 3px;
+    border-top-right-radius: 3px;
+    background-color: #f8f8f8;
+  }
+  
+  .panel-body {
+    padding: 15px;
+  }
+  
+  .panel-primary .panel-heading {
+    background-color: #337ab7;
+    border-color: #337ab7;
+    color: #fff;
+  }
+  
+  .panel-success .panel-heading {
+    background-color: #5cb85c;
+    border-color: #5cb85c;
+    color: #fff;
+  }
+  
+  .panel-info .panel-heading {
+    background-color: #5bc0de;
+    border-color: #5bc0de;
+    color: #fff;
+  }
+  
+  .panel-warning .panel-heading {
+    background-color: #f0ad4e;
+    border-color: #f0ad4e;
+    color: #fff;
+  }
+  
+  .panel-danger .panel-heading {
+    background-color: #d9534f;
+    border-color: #d9534f;
+    color: #fff;
+  }
+  
+  /* Status labels */
+  .label {
+    display: inline-block;
+    padding: 0.25em 0.6em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25em;
+  }
+  
+  .label-success {
+    background-color: #5cb85c;
+  }
+  
+  .label-warning {
+    background-color: #f0ad4e;
+  }
+  
+  .label-danger {
+    background-color: #d9534f;
+  }
+  
+  /* Report forms */
+  .report-filter-form {
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: #f8f8f8;
+    border-radius: 4px;
+  }
+  
+  /* Chart containers */
+  .chart-container {
+    position: relative;
+    height: 400px;
+  }
+  
+  /* User avatar */
+  .user-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+  }
+  
+  /* Improve form appearance */
+  .qor-field__input {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+  }
+  
+  .qor-field__label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    display: block;
+  }
+  
+  /* Make action buttons more visible */
+  .qor-action-button {
+    margin-right: 10px !important;
+  }
+  
+  /* Highlight important admin actions */
+  .qor-action--primary {
+    background-color: #337ab7 !important;
+    color: white !important;
+  }
+  
+  .qor-action--danger {
+    background-color: #d9534f !important;
+    color: white !important;
+  }
+  
+  /* Responsive tables */
+  @media (max-width: 768px) {
+    .qor-table-container {
+      overflow-x: auto;
+    }
+  }
+  
+  /* Fix padding in forms */
+  .qor-form__row {
+    margin-bottom: 15px;
+  }
+  
+  /* Better spacing for dashboard */
+  .qor-section + .qor-section {
+    margin-top: 30px;
+  }

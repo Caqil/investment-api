@@ -1,0 +1,163 @@
+{{define "reports/referrals"}}
+<div class="qor-page__body">
+  <div class="qor-section">
+    <div class="qor-section__header">
+      <h4>Referral Performance Report</h4>
+    </div>
+    
+    <div class="qor-section__body">
+      <!-- Referral Summary Cards -->
+      <div class="row">
+        <div class="col-md-4">
+          <div class="panel panel-primary">
+            <div class="panel-heading">
+              <h5>Total Referrals</h5>
+            </div>
+            <div class="panel-body">
+              <h3>{{.ReferralSummary.TotalReferrals}}</h3>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-4">
+          <div class="panel panel-success">
+            <div class="panel-heading">
+              <h5>Total Referral Bonus</h5>
+            </div>
+            <div class="panel-body">
+              <h3>{{.ReferralSummary.TotalReferralBonus}} BDT</h3>
+            </div>
+          </div>
+        </div>
+        
+        <div class="col-md-4">
+          <div class="panel panel-info">
+            <div class="panel-heading">
+              <h5>Total Profit Bonus</h5>
+            </div>
+            <div class="panel-body">
+              <h3>{{.ReferralSummary.TotalProfitBonus}} BDT</h3>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <br>
+      
+      <!-- Top Referrers -->
+      <div class="row">
+        <div class="col-md-12">
+          <div class="panel">
+            <div class="panel-heading">
+              <h5>Top 10 Referrers</h5>
+            </div>
+            <div class="panel-body">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>User ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Referrals</th>
+                    <th>Total Bonus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {{range .TopReferrers}}
+                  <tr>
+                    <td>{{.UserID}}</td>
+                    <td>{{.Name}}</td>
+                    <td>{{.Email}}</td>
+                    <td>{{.Count}}</td>
+                    <td>{{.TotalBonus}} BDT</td>
+                  </tr>
+                  {{end}}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <br>
+      
+      <!-- Visualization -->
+      <div class="row">
+        <div class="col-md-12">
+          <div class="panel">
+            <div class="panel-heading">
+              <h5>Top Referrers by Number of Referrals</h5>
+            </div>
+            <div class="panel-body">
+              <canvas id="referrersChart" width="800" height="400"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  // Prepare data for top referrers chart
+  var referrerNames = [{{range .TopReferrers}}"{{.Name}}",{{end}}];
+  var referralCounts = [{{range .TopReferrers}}{{.Count}},{{end}}];
+  var bonusAmounts = [{{range .TopReferrers}}{{.TotalBonus}},{{end}}];
+  
+  // Create chart
+  var ctx = document.getElementById('referrersChart').getContext('2d');
+  var chart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: referrerNames,
+      datasets: [
+        {
+          label: 'Number of Referrals',
+          data: referralCounts,
+          backgroundColor: 'rgba(54, 162, 235, 0.7)',
+          borderColor: 'rgba(54, 162, 235, 1)',
+          borderWidth: 1,
+          yAxisID: 'y'
+        },
+        {
+          label: 'Total Bonus (BDT)',
+          data: bonusAmounts,
+          backgroundColor: 'rgba(255, 99, 132, 0.7)',
+          borderColor: 'rgba(255, 99, 132, 1)',
+          borderWidth: 1,
+          yAxisID: 'y1'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      scales: {
+        y: {
+          type: 'linear',
+          display: true,
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Number of Referrals'
+          },
+          beginAtZero: true
+        },
+        y1: {
+          type: 'linear',
+          display: true,
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Total Bonus (BDT)'
+          },
+          beginAtZero: true,
+          grid: {
+            drawOnChartArea: false
+          }
+        }
+      }
+    }
+  });
+</script>
+{{end}}
