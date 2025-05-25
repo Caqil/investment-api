@@ -1,25 +1,24 @@
-// admin/app/dashboard/page.tsx
+// app/admin/dashboard/page.tsx
 "use client";
 
 import React, { useEffect, useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Overview } from "@/components/dashboard/overview-cards";
-import { RecentUsers } from "@/components/dashboard/recent-users";
-import { RecentWithdrawals } from "@/components/dashboard/recent-withdrawals";
-import { RecentTransactions } from "@/components/dashboard/recent-transactions";
-import { KYCStats } from "@/components/dashboard/kyc-stats";
-import { dashboardApi } from "@/lib/api";
-import { DashboardStats } from "@/types/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { adminApi } from "@/lib/admin-api";
+import { toast } from "sonner";
 import {
   ArrowUpRight,
   Users,
   CircleDollarSign,
   AlertCircle,
 } from "lucide-react";
+import { Overview } from "@/components/dashboard/overview-cards";
+import { RecentUsers } from "@/components/dashboard/recent-users";
+import { RecentWithdrawals } from "@/components/dashboard/recent-withdrawals";
+import { KYCStats } from "@/components/dashboard/kyc-stats";
 
-export default function DashboardPage() {
-  const [stats, setStats] = useState<DashboardStats | null>(null);
+export default function AdminDashboardPage() {
+  const [stats, setStats] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,11 +26,12 @@ export default function DashboardPage() {
     async function fetchDashboardStats() {
       try {
         setIsLoading(true);
-        const data = await dashboardApi.getStats();
-        setStats(data);
+        const response = await adminApi.getDashboardStats();
+        setStats(response.data);
       } catch (error) {
         console.error("Error fetching dashboard stats:", error);
         setError("Failed to load dashboard statistics");
+        toast.error("Failed to load dashboard statistics");
       } finally {
         setIsLoading(false);
       }
@@ -40,8 +40,30 @@ export default function DashboardPage() {
     fetchDashboardStats();
   }, []);
 
-  // Placeholder data if the API call fails
-  const placeholderStats: DashboardStats = {
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {Array(4)
+            .fill(0)
+            .map((_, i) => (
+              <Card key={i} className="animate-pulse">
+                <CardHeader className="pb-2">
+                  <div className="h-4 w-24 bg-muted rounded"></div>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-6 w-16 bg-muted rounded"></div>
+                </CardContent>
+              </Card>
+            ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback stats
+  const displayStats = stats || {
     totalUsers: 0,
     activeUsers: 0,
     totalBalance: 0,
@@ -52,9 +74,8 @@ export default function DashboardPage() {
     kycApprovalRate: 0,
     recentUsers: [],
     recentWithdrawals: [],
+    recentTransactions: [],
   };
-
-  const displayStats = stats || placeholderStats;
 
   return (
     <div className="space-y-6">
@@ -152,40 +173,16 @@ export default function DashboardPage() {
             totalWithdrawals={displayStats.totalWithdrawals}
           />
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <RecentUsers users={displayStats.recentUsers.slice(0, 5)} />
-            <RecentWithdrawals
-              withdrawals={displayStats.recentWithdrawals.slice(0, 5)}
-            />
+            <RecentUsers users={displayStats.recentUsers} />
+            <RecentWithdrawals withdrawals={displayStats.recentWithdrawals} />
             <KYCStats
               pendingCount={displayStats.pendingKYC}
               approvalRate={displayStats.kycApprovalRate}
             />
           </div>
         </TabsContent>
-        <TabsContent value="analytics" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Analytics</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center">
-              <p className="text-muted-foreground">
-                Detailed analytics coming soon.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="reports" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Reports</CardTitle>
-            </CardHeader>
-            <CardContent className="h-[300px] flex items-center justify-center">
-              <p className="text-muted-foreground">
-                Report generation coming soon.
-              </p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+
+        {/* Other tabs */}
       </Tabs>
     </div>
   );

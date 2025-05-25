@@ -1,27 +1,29 @@
+// app/page.tsx
 "use client";
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { isAuthenticated } from "../services/auth-service";
+import { useAuth } from "@/providers/auth-provider";
 
-export default function HomePage() {
+export default function Home() {
+  const { user, isAdmin, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    // If authenticated, stay at root (which shows dashboard)
-    // If not authenticated, redirect to login
-    if (!isAuthenticated()) {
-      router.push("/login");
-    } else {
-      // Redirect to dashboard
-      router.push("/dashboard");
+    if (!isLoading) {
+      if (!user) {
+        router.push("/login");
+      } else if (isAdmin) {
+        router.push("/admin/dashboard");
+      } else {
+        router.push("/user/dashboard");
+      }
     }
-  }, [router]);
+  }, [user, isAdmin, isLoading, router]);
 
-  // This is just a fallback while checking auth
   return (
-    <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    <div className="flex h-screen items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-primary"></div>
     </div>
   );
 }
