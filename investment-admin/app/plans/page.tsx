@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { DashboardShell } from "@/components/layout/dashboard-shell";
-import { PlanList } from "@/components/plans/plan-list";
 import { PlanStats } from "@/components/plans/plan-stats";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, RefreshCw } from "lucide-react";
@@ -16,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePlans } from "@/hooks/use-plan";
+import { PlansTable } from "@/components/plans/plan-table";
 
 export default function PlansPage() {
   const { plans, loading, error, fetchPlans, createPlan } = usePlans();
@@ -59,12 +59,7 @@ export default function PlansPage() {
 
       <PlanStats plans={plans} loading={loading} />
 
-      <PlanList
-        plans={plans}
-        loading={loading}
-        onRefresh={fetchPlans}
-        onError={(message) => setFormError(message)}
-      />
+      <PlansTable />
 
       {/* Create Plan Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
