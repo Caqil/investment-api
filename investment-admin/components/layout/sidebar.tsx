@@ -30,16 +30,16 @@ interface SidebarProps {
 }
 
 const items = [
-  { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "Users", href: "/users", icon: Users },
-  { name: "Plans", href: "/plans", icon: CreditCard },
-  { name: "Payments", href: "/payments", icon: BarChart3 },
-  { name: "Withdrawals", href: "/withdrawals", icon: CreditCard },
-  { name: "KYC Verification", href: "/kyc", icon: Shield },
-  { name: "Tasks", href: "/tasks", icon: ListChecks },
-  { name: "News", href: "/news", icon: NewspaperIcon },
-  { name: "Notifications", href: "/notifications", icon: Bell },
-  { name: "Settings", href: "/settings", icon: Settings },
+  { name: "Dashboard", href: "/admin/dashboard", icon: Home },
+  { name: "Users", href: "/admin/users", icon: Users },
+  { name: "Plans", href: "/admin/plans", icon: CreditCard },
+  { name: "Payments", href: "/admin/payments", icon: BarChart3 },
+  { name: "Withdrawals", href: "/admin/withdrawals", icon: CreditCard },
+  { name: "KYC Verification", href: "/admin/kyc", icon: Shield },
+  { name: "Tasks", href: "/admin/tasks", icon: ListChecks },
+  { name: "News", href: "/admin/news", icon: NewspaperIcon },
+  { name: "Notifications", href: "/admin/notifications", icon: Bell },
+  { name: "Settings", href: "/admin/settings", icon: Settings },
 ];
 
 export function Sidebar({ open, onOpenChange }: SidebarProps) {

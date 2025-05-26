@@ -1,13 +1,8 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
-import {
-  AlertTriangle,
-  CheckCircle,
-  ThumbsUp,
-  Users,
-  Download,
-} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ListChecks, Users, ThumbsUp, Download, Sparkles } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface TaskStatsProps {
   stats: {
@@ -21,85 +16,63 @@ interface TaskStatsProps {
 }
 
 export function TaskStats({ stats, loading }: TaskStatsProps) {
-  if (loading) {
-    return (
-      <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5 mb-6">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <Card key={i} className="p-6">
-            <div className="flex items-center space-x-4">
-              <div className="h-12 w-12 rounded-full bg-gray-200 animate-pulse"></div>
-              <div className="space-y-2">
-                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
-                <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
-              </div>
-            </div>
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-5 mb-6">
-      <Card className="p-6">
-        <div className="flex items-center space-x-4">
-          <div className="p-2 bg-blue-100 rounded-full">
-            <CheckCircle className="h-6 w-6 text-blue-600" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Total Tasks</p>
-            <h3 className="text-2xl font-bold">{stats.totalTasks}</h3>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <div className="flex items-center space-x-4">
-          <div className="p-2 bg-yellow-100 rounded-full">
-            <AlertTriangle className="h-6 w-6 text-yellow-600" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Mandatory Tasks</p>
-            <h3 className="text-2xl font-bold">{stats.mandatoryTasks}</h3>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <div className="flex items-center space-x-4">
-          <div className="p-2 bg-purple-100 rounded-full">
-            <Users className="h-6 w-6 text-purple-600" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Follow Tasks</p>
-            <h3 className="text-2xl font-bold">{stats.followTasks}</h3>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <div className="flex items-center space-x-4">
-          <div className="p-2 bg-green-100 rounded-full">
-            <ThumbsUp className="h-6 w-6 text-green-600" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Like Tasks</p>
-            <h3 className="text-2xl font-bold">{stats.likeTasks}</h3>
-          </div>
-        </div>
-      </Card>
-
-      <Card className="p-6">
-        <div className="flex items-center space-x-4">
-          <div className="p-2 bg-red-100 rounded-full">
-            <Download className="h-6 w-6 text-red-600" />
-          </div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">Install Tasks</p>
-            <h3 className="text-2xl font-bold">{stats.installTasks}</h3>
-          </div>
-        </div>
-      </Card>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
+      <StatsCard
+        title="Total Tasks"
+        value={stats.totalTasks}
+        icon={<Sparkles className="h-4 w-4 text-muted-foreground" />}
+        loading={loading}
+      />
+      <StatsCard
+        title="Required Tasks"
+        value={stats.mandatoryTasks}
+        icon={<ListChecks className="h-4 w-4 text-red-500" />}
+        loading={loading}
+      />
+      <StatsCard
+        title="Follow Tasks"
+        value={stats.followTasks}
+        icon={<Users className="h-4 w-4 text-blue-500" />}
+        loading={loading}
+      />
+      <StatsCard
+        title="Like Tasks"
+        value={stats.likeTasks}
+        icon={<ThumbsUp className="h-4 w-4 text-purple-500" />}
+        loading={loading}
+      />
+      <StatsCard
+        title="Install Tasks"
+        value={stats.installTasks}
+        icon={<Download className="h-4 w-4 text-green-500" />}
+        loading={loading}
+      />
     </div>
+  );
+}
+
+interface StatsCardProps {
+  title: string;
+  value: number;
+  icon: React.ReactNode;
+  loading: boolean;
+}
+
+function StatsCard({ title, value, icon, loading }: StatsCardProps) {
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        {icon}
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Skeleton className="h-7 w-12" />
+        ) : (
+          <div className="text-2xl font-bold">{value}</div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

@@ -103,7 +103,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 
 	// Initialize controllers
 	authController := controller.NewAuthController(authService, userService, deviceService, planService, notificationService)
-	userController := controller.NewUserController(userService, bonusService, notificationService)
+	userController := controller.NewUserController(userService, bonusService, notificationService, transactionRepo)
 	paymentController := controller.NewPaymentController(paymentService)
 	planController := controller.NewPlanController(planService, userService, notificationService)
 	withdrawalController := controller.NewWithdrawalController(withdrawalService, taskService, notificationService)

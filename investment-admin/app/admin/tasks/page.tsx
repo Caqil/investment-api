@@ -21,13 +21,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRouter } from "next/navigation";
 import { TaskStats } from "@/components/tasks/task-stats";
 import { TasksTable } from "@/components/tasks/tasks-table";
 import { CreateTaskDialog } from "@/components/tasks/create-task-dialog";
+import { TaskDetailDialog } from "@/components/tasks/task-detail-dialog";
 
 export default function TasksPage() {
-  const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +35,12 @@ export default function TasksPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [mandatoryFilter, setMandatoryFilter] = useState<string>("all");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Dialog states
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+
   const [stats, setStats] = useState({
     totalTasks: 0,
     mandatoryTasks: 0,
@@ -142,7 +146,12 @@ export default function TasksPage() {
   };
 
   const handleTaskEdit = (id: number) => {
-    router.push(`/tasks/${id}`);
+    setSelectedTaskId(id);
+    setDetailDialogOpen(true);
+  };
+
+  const handleTaskUpdated = () => {
+    setRefreshTrigger((prev) => prev + 1);
   };
 
   const handleRefresh = () => {
@@ -251,6 +260,14 @@ export default function TasksPage() {
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
         onTaskCreated={handleTaskCreated}
+      />
+
+      {/* Task Detail/Edit Dialog */}
+      <TaskDetailDialog
+        taskId={selectedTaskId}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        onTaskUpdated={handleTaskUpdated}
       />
     </DashboardShell>
   );

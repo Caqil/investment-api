@@ -13,18 +13,21 @@ import (
 type UserController struct {
 	userService         *service.UserService
 	bonusService        *service.BonusService
-	notificationService *service.NotificationService // Add this field
+	notificationService *service.NotificationService
+	transactionRepo     *repository.TransactionRepository
 }
 
 func NewUserController(
 	userService *service.UserService,
 	bonusService *service.BonusService,
-	notificationService *service.NotificationService, // Add this parameter
+	notificationService *service.NotificationService,
+	transactionRepo *repository.TransactionRepository, // Add this parameter
 ) *UserController {
 	return &UserController{
 		userService:         userService,
 		bonusService:        bonusService,
-		notificationService: notificationService, // Assign the field
+		notificationService: notificationService,
+		transactionRepo:     transactionRepo, // Store it
 	}
 }
 
@@ -198,6 +201,7 @@ func (c *UserController) DisableBiometric(ctx *gin.Context) {
 }
 
 // GetTransactions gets the user's transactions
+// internal/controller/user_controller.go
 func (c *UserController) GetTransactions(ctx *gin.Context) {
 	// Get user ID from context
 	userID, exists := middleware.GetUserID(ctx)
@@ -209,9 +213,8 @@ func (c *UserController) GetTransactions(ctx *gin.Context) {
 	// Get pagination parameters
 	limit, offset := getPaginationParams(ctx)
 
-	// Get transactions
-	transactionRepo := repository.NewTransactionRepository(nil) // Use the DB from the service
-	transactions, err := transactionRepo.FindByUserID(userID, limit, offset)
+	// Use the injected repository instead of creating a new one
+	transactions, err := c.transactionRepo.FindByUserID(userID, limit, offset)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get transactions"})
 		return

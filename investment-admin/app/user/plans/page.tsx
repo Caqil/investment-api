@@ -66,9 +66,8 @@ export default function PlansPage() {
           throw new Error(plansResponse.error);
         }
 
-        if (plansResponse.data) {
-          setPlans(plansResponse.data.plans);
-        }
+        const plansList = plansResponse.data?.plans || [];
+        setPlans(plansList);
 
         // Fetch user profile to get current plan
         const profileResponse = await userApi.profile.getProfile();
@@ -76,13 +75,15 @@ export default function PlansPage() {
           throw new Error(profileResponse.error);
         }
 
-        if (profileResponse.data) {
-          setUser(profileResponse.data.user);
+        // Store the profile data in a local variable to help TypeScript track the null check
+        const profileData = profileResponse.data;
+        if (profileData) {
+          setUser(profileData.user);
 
           // Find current plan
-          if (plansResponse.data && plansResponse.data.plans.length > 0) {
-            const userPlan = plansResponse.data.plans.find(
-              (plan) => plan.id === profileResponse.data.user.plan_id
+          if (plansList.length > 0) {
+            const userPlan = plansList.find(
+              (plan) => plan.id === profileData.user.plan_id
             );
             setCurrentPlan(userPlan || null);
           }

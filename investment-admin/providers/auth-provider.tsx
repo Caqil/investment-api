@@ -10,7 +10,10 @@ import {
   setToken,
   logout as logoutUser,
   isAuthenticated,
+  removeUser,
+  removeToken,
 } from "@/lib/auth";
+import { clearAdminStatus } from "@/lib/admin-detection";
 
 interface AuthContextType {
   user: User | null;
@@ -84,13 +87,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     initAuth();
   }, []);
 
-  // Login function
-  const login = async (credentials: LoginCredentials): Promise<boolean> => {
+  // providers/auth-provider.tsx - update the login function
+  const login = async (credentials: LoginCredentials) => {
     setLoading(true);
     setError(null);
 
     try {
-      console.log("Attempting login for", credentials.email);
       const response = await api.auth.login(credentials);
 
       if (response.error) {
@@ -99,24 +101,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       if (response.data) {
-        const { token, user } = response.data;
+        console.log("Auth response:", {
+          user: {
+            id: response.data.user.id,
+            email: response.data.user.email,
+            is_admin: response.data.user.is_admin,
+          },
+        });
 
         // Store token and user data
-        console.log("Login successful, storing token and user data");
-        setToken(token);
-        storeUser(user);
-        setUser(user);
-
+        setToken(response.data.token);
+        setUser(response.data.user);
         return true;
       }
 
-      setError("Login failed. Please try again.");
       return false;
     } catch (err) {
       console.error("Login error:", err);
-      setError(
-        err instanceof Error ? err.message : "An unexpected error occurred"
-      );
+      setError("An unexpected error occurred");
       return false;
     } finally {
       setLoading(false);
@@ -125,8 +127,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Logout function
   const logout = () => {
-    console.log("Logging out user");
-    logoutUser();
+    removeToken();
+    removeUser();
+    clearAdminStatus(); // Clear admin status
     setUser(null);
   };
 

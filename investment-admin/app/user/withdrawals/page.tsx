@@ -351,7 +351,7 @@ export default function WithdrawalsPage() {
 
       {(!mandatoryTasksCompleted || !isKycVerified) && (
         <Alert
-          variant="warning"
+          variant="destructive"
           className="bg-amber-50 border-amber-200 dark:bg-amber-950/30 dark:border-amber-800"
         >
           <AlertCircle className="h-4 w-4 text-amber-800 dark:text-amber-400" />

@@ -17,6 +17,8 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2 } from "lucide-react";
+import { getUser } from "@/lib/auth";
+import { detectAdminStatus } from "@/lib/admin-detection";
 
 // Generate a device ID for admin dashboard
 function getOrCreateDeviceId(): string {
@@ -44,7 +46,6 @@ export function LoginForm() {
   useEffect(() => {
     setDeviceId(getOrCreateDeviceId());
   }, []);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError(null);
@@ -66,7 +67,15 @@ export function LoginForm() {
       });
 
       if (success) {
-        router.push("/dashboard");
+        // Detect admin status dynamically
+        const isAdmin = await detectAdminStatus();
+
+        // Redirect based on detected admin status
+        if (isAdmin) {
+          router.push("/admin/dashboard");
+        } else {
+          router.push("/user/dashboard");
+        }
       }
     } catch (error) {
       console.error("Login error:", error);
@@ -75,7 +84,6 @@ export function LoginForm() {
       setIsLoading(false);
     }
   };
-
   const error = formError || authError;
 
   return (

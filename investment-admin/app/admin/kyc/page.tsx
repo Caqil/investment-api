@@ -22,9 +22,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRouter } from "next/navigation";
 import { KYCTable } from "@/components/kyc/kyc-table";
 import { KYCStats } from "@/components/kyc/kyc-stats";
+import { KYCDetailDialog } from "@/components/kyc/kyc-detail-dialog";
 
 interface KYCStats {
   pending_count: number;
@@ -34,7 +34,6 @@ interface KYCStats {
 }
 
 export default function KYCPage() {
-  const router = useRouter();
   const [kycDocuments, setKYCDocuments] = useState<KYCDocument[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<KYCDocument[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,6 +42,11 @@ export default function KYCPage() {
   const [documentTypeFilter, setDocumentTypeFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("pending");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Dialog states
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedKYCId, setSelectedKYCId] = useState<number | null>(null);
+
   const [stats, setStats] = useState<KYCStats>({
     pending_count: 0,
     approved_count: 0,
@@ -144,7 +148,12 @@ export default function KYCPage() {
   }, [kycDocuments, documentTypeFilter, searchQuery]);
 
   const handleViewDocument = (id: number) => {
-    router.push(`/kyc/${id}`);
+    setSelectedKYCId(id);
+    setDetailDialogOpen(true);
+  };
+
+  const handleKYCUpdated = () => {
+    setRefreshTrigger((prev) => prev + 1);
   };
 
   const handleRefresh = () => {
@@ -272,6 +281,14 @@ export default function KYCPage() {
           </CardHeader>
         </Card>
       )}
+
+      {/* KYC Detail Dialog */}
+      <KYCDetailDialog
+        kycId={selectedKYCId}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        onKYCUpdated={handleKYCUpdated}
+      />
     </DashboardShell>
   );
 }

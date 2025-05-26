@@ -1,14 +1,14 @@
-// app/user/layout.tsx
-import { UserShell } from "@/components/layout/user/user-shell";
+// app/admin/layout.tsx
+import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { isAuthenticated, getUser } from "@/lib/auth";
 import { ThemeProvider } from "@/providers/theme-provider";
 import { redirect } from "next/navigation";
 
-interface UserLayoutProps {
+interface AdminLayoutProps {
   children: React.ReactNode;
 }
 
-export default function UserLayout({ children }: UserLayoutProps) {
+export default function AdminLayout({ children }: AdminLayoutProps) {
   // Check authentication and role
   if (typeof window !== "undefined") {
     if (!isAuthenticated()) {
@@ -16,14 +16,14 @@ export default function UserLayout({ children }: UserLayoutProps) {
     }
 
     const user = getUser();
-    if (user?.is_admin) {
-      redirect("/admin/dashboard");
+    if (!user?.is_admin) {
+      redirect("/user/dashboard");
     }
   }
 
   return (
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-      <UserShell>{children}</UserShell>
+      {children}
     </ThemeProvider>
   );
 }

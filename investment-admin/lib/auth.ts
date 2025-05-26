@@ -59,15 +59,24 @@ export function removeToken(): void {
 /**
  * Store user data in localStorage
  */
+// lib/auth.ts - ensure the setUser function preserves the is_admin flag
 export function setUser(user: User): void {
   if (typeof window !== 'undefined') {
+    console.log("Storing user data:", {
+      id: user.id,
+      email: user.email,
+      is_admin: user.is_admin
+    });
+    
     localStorage.setItem(USER_KEY, JSON.stringify(user));
     
     // Also store a simplified version in a cookie for middleware
     const userInfo = { 
       id: user.id, 
-      is_admin: user.is_admin 
+      is_admin: user.is_admin  // Ensure this is correctly set
     };
+    console.log("Setting user cookie with:", userInfo);
+    
     Cookies.set('user_info', JSON.stringify(userInfo), { 
       expires: 7,
       path: '/',

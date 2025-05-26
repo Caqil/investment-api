@@ -1,4 +1,3 @@
-// components/ui/steps.tsx
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -12,6 +11,9 @@ interface StepProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
   description?: string;
   icon?: React.ComponentType<{ className?: string }>;
+  active?: boolean;
+  completed?: boolean;
+  step?: number;
 }
 
 export const Steps = ({
@@ -23,7 +25,8 @@ export const Steps = ({
 }: StepsProps) => {
   // Clone children and add active state
   const stepsWithProps = React.Children.map(children, (child, index) => {
-    if (React.isValidElement(child)) {
+    if (React.isValidElement<StepProps>(child)) {
+      // Explicitly type the child
       return React.cloneElement(child, {
         active: index === active,
         completed: index < active,
@@ -56,7 +59,7 @@ export const Step = ({
   step,
   className,
   ...props
-}: StepProps & { active?: boolean; completed?: boolean; step?: number }) => {
+}: StepProps) => {
   return (
     <div
       className={cn(

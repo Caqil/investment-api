@@ -1,9 +1,10 @@
+// components/auth/auth-guard.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { isAuthenticated } from "@/lib/auth";
+import { isAuthenticated, getUser } from "@/lib/auth";
 import { useAuth } from "@/providers/auth-provider";
 
 interface AuthGuardProps {
@@ -38,8 +39,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     const authStatus = isAuthenticated();
 
     if (!authStatus) {
-      // Don't redirect directly in render phase
-      // Instead, schedule it for the next tick
+      // Redirect to login
       router.push("/login");
     } else {
       setShouldRender(true);
@@ -51,8 +51,10 @@ export function AuthGuard({ children }: AuthGuardProps) {
   // Handle redirecting already logged-in users from public paths
   useEffect(() => {
     if (isPublicPath && user && !loading) {
-      // Redirect to appropriate dashboard based on user role
-      const redirectPath = user.is_admin ? "/dashboard" : "/user/dashboard";
+      // Updated: Redirect to appropriate dashboard based on user role
+      const redirectPath = user.is_admin
+        ? "/admin/dashboard"
+        : "/user/dashboard";
       router.push(redirectPath);
     }
   }, [isPublicPath, user, loading, router]);

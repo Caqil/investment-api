@@ -179,16 +179,24 @@ func (c *AuthController) Login(ctx *gin.Context) {
 			_ = c.deviceService.UpdateDeviceLastLogin(req.DeviceID)
 		}
 	} else {
-		// Regular users must use registered devices
+		// Regular users
 		// Check if device is registered to this user
 		isUserDevice, err := c.deviceService.IsDeviceRegisteredToUser(req.DeviceID, user.ID)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check device"})
 			return
 		}
+
 		if !isUserDevice {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Device not registered to this user"})
-			return
+			// Auto-register the new device
+			err = c.deviceService.RegisterDevice(user.ID, req.DeviceID)
+			if err != nil {
+				ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register new device"})
+				return
+			}
+
+			// Log device registration (optional)
+			// log.Printf("New device registered for user %d: %s", user.ID, req.DeviceID)
 		}
 
 		// Update device last login
