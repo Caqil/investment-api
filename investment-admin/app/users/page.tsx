@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { UsersTable } from "@/components/users/user-table";
 import { CreateUserDialog } from "@/components/users/create-user-dialog";
+import { toast } from "sonner";
 
 // Stats component for user metrics
 function UserStats({ stats, loading }: { stats: any; loading: boolean }) {
@@ -133,6 +134,10 @@ export default function UsersPage() {
     } catch (err) {
       console.error("Error fetching users:", err);
       setError(err instanceof Error ? err.message : "Failed to load users");
+      toast.error(
+        "Failed to load users: " +
+          (err instanceof Error ? err.message : "Unknown error")
+      );
       setUsers([]);
     } finally {
       setLoading(false);
@@ -171,9 +176,9 @@ export default function UsersPage() {
         (user) =>
           user.name.toLowerCase().includes(query) ||
           user.email.toLowerCase().includes(query) ||
-          user.phone.toLowerCase().includes(query) ||
+          user.phone?.toLowerCase().includes(query) ||
           user.id.toString().includes(query) ||
-          user.referral_code.toLowerCase().includes(query)
+          user.referral_code?.toLowerCase().includes(query)
       );
     }
 
@@ -183,10 +188,12 @@ export default function UsersPage() {
   const handleUserCreated = (newUser: User) => {
     // Refresh the user list
     setRefreshTrigger((prev) => prev + 1);
+    toast.success(`User ${newUser.name} created successfully`);
   };
 
   const handleRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
+    toast.success("User list refreshed");
   };
 
   // Get unique plans for filter
@@ -255,14 +262,14 @@ export default function UsersPage() {
         onValueChange={setActiveTab}
         className="mb-6"
       >
-        <TabsList>
+        <TabsList className="mb-4">
           <TabsTrigger value="all">All Users</TabsTrigger>
           <TabsTrigger value="active">Active</TabsTrigger>
           <TabsTrigger value="blocked">Blocked</TabsTrigger>
           <TabsTrigger value="admin">Admins</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="all" className="mt-4">
+        <TabsContent value="all">
           <UsersTable
             users={filteredUsers}
             loading={loading}
@@ -270,7 +277,7 @@ export default function UsersPage() {
           />
         </TabsContent>
 
-        <TabsContent value="active" className="mt-4">
+        <TabsContent value="active">
           <UsersTable
             users={filteredUsers}
             loading={loading}
@@ -278,7 +285,7 @@ export default function UsersPage() {
           />
         </TabsContent>
 
-        <TabsContent value="blocked" className="mt-4">
+        <TabsContent value="blocked">
           <UsersTable
             users={filteredUsers}
             loading={loading}
@@ -286,7 +293,7 @@ export default function UsersPage() {
           />
         </TabsContent>
 
-        <TabsContent value="admin" className="mt-4">
+        <TabsContent value="admin">
           <UsersTable
             users={filteredUsers}
             loading={loading}

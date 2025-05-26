@@ -32,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { UserDetailsDialog } from "./user-detail-dialog";
 
 interface UsersTableProps {
   users: User[];
@@ -54,7 +55,6 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
     setSelectedUserId(userId);
     setShowUserDetailsDialog(true);
   };
-
 
   const handleBlockUser = async () => {
     if (!actionUser) return;
@@ -142,7 +142,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
             <Eye className="h-6 w-6 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium">No users found</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm   mt-1">
             There are no users matching your criteria.
           </p>
         </div>
@@ -152,76 +152,74 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
 
   return (
     <>
-      <div className="border rounded-md overflow-hidden">
+      <div className="border rounded-md">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y">
+            <thead>
               <tr>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                 >
                   ID
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                 >
                   Name
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                 >
                   Email
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                 >
                   Phone
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                 >
                   Balance
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                 >
                   Status
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
                 >
                   Created
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider"
                 >
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y">
               {users.map((user) => (
                 <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium ">
                     {user.id}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
                         {user.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          {user.name}
-                        </div>
+                        <div className="text-sm font-medium">{user.name}</div>
                         {user.is_admin && (
                           <Badge
                             variant="outline"
@@ -233,19 +231,19 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
                     {user.email}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
                     {user.phone}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
                     {new Intl.NumberFormat("en-US", {
                       style: "currency",
                       currency: "BDT",
                     }).format(user.balance)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
                     {user.is_blocked ? (
                       <Badge
                         variant="outline"
@@ -262,7 +260,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
                       </Badge>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
                     {formatDate(user.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -323,7 +321,12 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
           </table>
         </div>
       </div>
-
+      <UserDetailsDialog
+        userId={selectedUserId}
+        open={showUserDetailsDialog}
+        onOpenChange={setShowUserDetailsDialog}
+        onAction={onRefresh}
+      />
       {/* Block User Dialog */}
       <AlertDialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
         <AlertDialogContent>
