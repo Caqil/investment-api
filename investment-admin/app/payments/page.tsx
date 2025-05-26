@@ -71,7 +71,7 @@ export default function PaymentsPage() {
     uddoktapay_count: 0,
     recent_payments: [],
   });
-
+  
   const fetchPaymentStats = async () => {
     try {
       const response = await api.payments.getStats();

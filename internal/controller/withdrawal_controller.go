@@ -91,7 +91,11 @@ func (c *WithdrawalController) RequestWithdrawal(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process withdrawal: " + err.Error()})
 		return
 	}
-
+	err = c.notificationService.CreateWithdrawalRequestNotification(userID, req.Amount, req.PaymentMethod)
+	if err != nil {
+		// Log error but continue
+		// TODO: Add proper logging
+	}
 	ctx.JSON(http.StatusOK, gin.H{
 		"message":    "Withdrawal request submitted successfully",
 		"withdrawal": withdrawal.ToResponse(),

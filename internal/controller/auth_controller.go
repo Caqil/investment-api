@@ -8,10 +8,11 @@ import (
 )
 
 type AuthController struct {
-	authService   *service.AuthService
-	userService   *service.UserService
-	deviceService *service.DeviceService
-	planService   *service.PlanService
+	authService         *service.AuthService
+	userService         *service.UserService
+	deviceService       *service.DeviceService
+	planService         *service.PlanService
+	notificationService *service.NotificationService // Add this field
 }
 
 func NewAuthController(
@@ -19,12 +20,14 @@ func NewAuthController(
 	userService *service.UserService,
 	deviceService *service.DeviceService,
 	planService *service.PlanService,
+	notificationService *service.NotificationService, // Add this parameter
 ) *AuthController {
 	return &AuthController{
-		authService:   authService,
-		userService:   userService,
-		deviceService: deviceService,
-		planService:   planService,
+		authService:         authService,
+		userService:         userService,
+		deviceService:       deviceService,
+		planService:         planService,
+		notificationService: notificationService, // Assign the field
 	}
 }
 
@@ -121,7 +124,13 @@ func (c *AuthController) Register(ctx *gin.Context) {
 			// In a real application, you would use a proper logging framework
 		}
 	}
-
+	if c.notificationService != nil {
+		err = c.notificationService.CreateRegistrationNotification(user.ID, user.Name)
+		if err != nil {
+			// Log error but continue
+			// TODO: Add proper logging
+		}
+	}
 	// Create response
 	userResponse := map[string]interface{}{
 		"id":              user.ID,

@@ -10,14 +10,16 @@ import (
 )
 
 type PlanController struct {
-	planService *service.PlanService
-	userService *service.UserService
+	planService         *service.PlanService
+	userService         *service.UserService
+	notificationService *service.NotificationService
 }
 
-func NewPlanController(planService *service.PlanService, userService *service.UserService) *PlanController {
+func NewPlanController(planService *service.PlanService, userService *service.UserService, notificationService *service.NotificationService) *PlanController {
 	return &PlanController{
-		planService: planService,
-		userService: userService,
+		planService:         planService,
+		userService:         userService,
+		notificationService: notificationService,
 	}
 }
 
@@ -81,7 +83,10 @@ func (c *PlanController) PurchasePlan(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to purchase plan: " + err.Error()})
 		return
 	}
-
+	err = c.notificationService.CreatePlanPurchaseNotification(userID, plan.Name, plan.Price)
+	if err != nil {
+		// Log error but continue
+	}
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Plan purchased successfully",
 		"plan":    plan.ToResponse(),

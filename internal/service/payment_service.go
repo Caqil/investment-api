@@ -645,3 +645,8 @@ func (s *PaymentService) GetTransactionByPaymentID(paymentID int64) (*model.Tran
 
 	return transaction, nil
 }
+
+// GetAllPayments gets all payments
+func (s *PaymentService) GetAllPayments(limit, offset int) ([]*model.Payment, error) {
+	return s.paymentRepo.FindAll(limit, offset)
+}

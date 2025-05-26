@@ -11,17 +11,20 @@ import (
 )
 
 type UserController struct {
-	userService  *service.UserService
-	bonusService *service.BonusService
+	userService         *service.UserService
+	bonusService        *service.BonusService
+	notificationService *service.NotificationService // Add this field
 }
 
 func NewUserController(
 	userService *service.UserService,
 	bonusService *service.BonusService,
+	notificationService *service.NotificationService, // Add this parameter
 ) *UserController {
 	return &UserController{
-		userService:  userService,
-		bonusService: bonusService,
+		userService:         userService,
+		bonusService:        bonusService,
+		notificationService: notificationService, // Assign the field
 	}
 }
 
@@ -108,7 +111,12 @@ func (c *UserController) UpdateProfile(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile: " + err.Error()})
 		return
 	}
-
+	if c.notificationService != nil {
+		err = c.notificationService.CreateProfileUpdateNotification(userID)
+		if err != nil {
+			// Log error but continue
+		}
+	}
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "Profile updated successfully",
 		"user":    user.ToResponse(),
@@ -141,7 +149,13 @@ func (c *UserController) ChangePassword(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to change password: " + err.Error()})
 		return
 	}
-
+	// Create password change notification
+	if c.notificationService != nil {
+		err = c.notificationService.CreatePasswordChangeNotification(userID)
+		if err != nil {
+			// Log error but continue
+		}
+	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 

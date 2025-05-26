@@ -6,7 +6,7 @@ import { Withdrawal } from '../types/withdrawal';
 import { KYCDocument } from '../types/kyc';
 import { Payment } from '../types/payment';
 import { Task } from '../types/task';
-import { Notification } from '../types/notification';
+import { Notification, NotificationStats } from '../types/notification';
 import { getToken } from './auth';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
@@ -86,7 +86,17 @@ export interface KYCDocumentResponse {
 export interface PaymentsResponse {
   payments: Payment[];
 }
-
+export interface PaymentStatsResponse {
+  total_payments: number;
+  pending_count: number;
+  completed_count: number;
+  failed_count: number;
+  manual_count?: number;
+  coingate_count?: number;
+  uddoktapay_count?: number;
+  total_amount: number;
+  recent_payments: Payment[];
+}
 export interface PaymentResponse {
   payment: Payment;
   transaction?: Transaction;
@@ -344,14 +354,8 @@ export const api = {
         body: JSON.stringify({ reason })
       });
     },
-    getStats: (): Promise<ApiResponse<{
-      total_payments: number;
-      total_amount: number;
-      pending_count: number;
-      completed_count: number;
-      failed_count: number;
-    }>> => {
-      return request<any>('/admin/payments/stats');
+    getStats: (): Promise<ApiResponse<PaymentStatsResponse>> => {
+      return request<PaymentStatsResponse>('/admin/payments/stats');
     }
   },
   
@@ -393,16 +397,69 @@ transactions: {
   }
 },
   
-  // Notification endpoints
-  notifications: {
-    getAll: (): Promise<ApiResponse<NotificationsResponse>> => {
-      return request<NotificationsResponse>('/admin/notifications');
-    },
-    send: (title: string, message: string): Promise<ApiResponse<MessageResponse>> => {
-      return request<MessageResponse>('/admin/notifications', {
-        method: 'POST',
-        body: JSON.stringify({ title, message })
-      });
-    }
-  }
+notifications: {
+  getAll: (options?: { 
+    user_id?: number; 
+    type?: string; 
+    is_read?: boolean;
+    limit?: number;
+    offset?: number;
+  }): Promise<ApiResponse<{ notifications: Notification[]; total: number }>> => {
+    // Build query string
+    const queryParams = new URLSearchParams();
+    if (options?.user_id) queryParams.append('user_id', options.user_id.toString());
+    if (options?.type) queryParams.append('type', options.type);
+    if (options?.is_read !== undefined) queryParams.append('is_read', options.is_read.toString());
+    if (options?.limit) queryParams.append('limit', options.limit.toString());
+    if (options?.offset) queryParams.append('offset', options.offset.toString());
+    
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+    
+    return request<{ notifications: Notification[]; total: number }>(`/admin/notifications${queryString}`);
+  },
+  
+  getStats: (): Promise<ApiResponse<NotificationStats>> => {
+    return request<NotificationStats>('/admin/notifications/stats');
+  },
+  
+  send: (data: { user_id?: number; title: string; message: string }): Promise<ApiResponse<MessageResponse>> => {
+    return request<MessageResponse>('/admin/notifications', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  
+  markAsRead: (id: number): Promise<ApiResponse<MessageResponse>> => {
+    return request<MessageResponse>(`/admin/notifications/${id}/read`, {
+      method: 'PUT',
+    });
+  },
+  
+  delete: (id: number): Promise<ApiResponse<MessageResponse>> => {
+    return request<MessageResponse>(`/admin/notifications/${id}`, {
+      method: 'DELETE',
+    });
+  },
+},
+userNotifications: {
+  getAll: (limit = 10, offset = 0): Promise<ApiResponse<{ notifications: Notification[]; unread_count: number }>> => {
+    return request<{ notifications: Notification[]; unread_count: number }>(`/notifications?limit=${limit}&offset=${offset}`);
+  },
+  
+  getUnreadCount: (): Promise<ApiResponse<{ unread_count: number }>> => {
+    return request<{ unread_count: number }>('/notifications/unread-count');
+  },
+  
+  markAsRead: (id: number): Promise<ApiResponse<MessageResponse>> => {
+    return request<MessageResponse>(`/notifications/${id}/read`, {
+      method: 'PUT',
+    });
+  },
+  
+  markAllAsRead: (): Promise<ApiResponse<MessageResponse>> => {
+    return request<MessageResponse>('/notifications/mark-all-read', {
+      method: 'PUT',
+    });
+  },
+},
 };

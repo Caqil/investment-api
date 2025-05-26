@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "../ui/badge";
 import { useAuth } from "@/providers/auth-provider";
+import { HeaderNotifications } from "./header-notifications";
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -34,19 +35,14 @@ export function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
           <Menu className="h-6 w-6" />
           <span className="sr-only">Toggle sidebar</span>
         </Button>
-       
       </div>
 
       <div className="flex items-center space-x-3">
         <ThemeToggle />
 
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          <Badge className="absolute -right-1 -top-1 h-5 w-5 p-0 flex items-center justify-center">
-            3
-          </Badge>
-          <span className="sr-only">Notifications</span>
-        </Button>
+        <div className="flex items-center gap-4">
+          <HeaderNotifications />
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

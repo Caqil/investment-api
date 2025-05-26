@@ -76,7 +76,12 @@ func (c *KYCController) SubmitKYC(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to submit KYC: " + err.Error()})
 		return
 	}
-
+	if c.notificationService != nil {
+		err = c.notificationService.CreateKYCSubmissionNotification(userID)
+		if err != nil {
+			// Log error but continue
+		}
+	}
 	ctx.JSON(http.StatusOK, gin.H{
 		"message": "KYC document submitted successfully and pending verification",
 		"kyc":     kyc.ToResponse(),

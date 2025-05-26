@@ -1,13 +1,17 @@
 package service
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
 	"github.com/Caqil/investment-api/internal/repository"
 	"github.com/Caqil/investment-api/pkg/database"
 	"github.com/Caqil/investment-api/pkg/utils"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type NotificationService struct {
@@ -91,28 +95,10 @@ func (s *NotificationService) CreateWithdrawalRejectionNotification(userID, with
 	return s.emailService.SendWithdrawalRejectionEmail(user.Email, amount, reason)
 }
 
-// CreateDepositNotification creates a notification for a deposit
-func (s *NotificationService) CreateDepositNotification(userID int64, amount float64, method string) error {
-	title := "Deposit Successful"
-	message := fmt.Sprintf("Your deposit of %.2f BDT via %s has been successfully processed and added to your balance.", amount, method)
-
-	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeDeposit)
-	return err
-}
-
 // CreateDailyBonusNotification creates a notification for a daily bonus
 func (s *NotificationService) CreateDailyBonusNotification(userID int64, amount float64) error {
 	title := "Daily Bonus Received"
 	message := fmt.Sprintf("You have received a daily bonus of %.2f BDT, which has been added to your balance.", amount)
-
-	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeBonus)
-	return err
-}
-
-// CreateReferralBonusNotification creates a notification for a referral bonus
-func (s *NotificationService) CreateReferralBonusNotification(userID int64, amount float64, referredName string) error {
-	title := "Referral Bonus Received"
-	message := fmt.Sprintf("You have received a referral bonus of %.2f BDT for referring %s.", amount, referredName)
 
 	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeBonus)
 	return err
@@ -124,24 +110,6 @@ func (s *NotificationService) CreateReferralProfitNotification(userID int64, amo
 	message := fmt.Sprintf("You have received %.2f BDT as profit from your referral %s.", amount, referredName)
 
 	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeBonus)
-	return err
-}
-
-// CreateKYCApprovalNotification creates a notification for a KYC approval
-func (s *NotificationService) CreateKYCApprovalNotification(userID int64) error {
-	title := "KYC Verified"
-	message := "Your KYC verification has been approved. You now have a verified account badge."
-
-	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
-	return err
-}
-
-// CreateKYCRejectionNotification creates a notification for a KYC rejection
-func (s *NotificationService) CreateKYCRejectionNotification(userID int64, reason string) error {
-	title := "KYC Verification Failed"
-	message := fmt.Sprintf("Your KYC verification has been rejected. Reason: %s", reason)
-
-	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
 	return err
 }
 
@@ -220,3 +188,254 @@ func (s *NotificationService) DeleteNotification(id, userID int64) error {
 func (s *NotificationService) DeleteAllNotifications(userID int64) error {
 	return s.notificationRepo.DeleteAllByUserID(userID)
 }
+
+// Add these methods to internal/service/notification_service.go
+
+// GetAllNotifications gets all notifications across all users
+func (s *NotificationService) GetAllNotifications(limit, offset int) ([]*model.Notification, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := s.notificationRepo.GetDB().Collection("notifications").Find(ctx, bson.M{}, options)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var notifications []*model.Notification
+	if err = cursor.All(ctx, &notifications); err != nil {
+		return nil, err
+	}
+
+	return notifications, nil
+}
+
+// GetReadNotificationsByUserID gets all read notifications for a user
+func (s *NotificationService) GetReadNotificationsByUserID(userID int64, limit, offset int) ([]*model.Notification, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := s.notificationRepo.GetDB().Collection("notifications").Find(ctx,
+		bson.M{
+			"user_id": userID,
+			"is_read": true,
+		},
+		options,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var notifications []*model.Notification
+	if err = cursor.All(ctx, &notifications); err != nil {
+		return nil, err
+	}
+
+	return notifications, nil
+}
+
+// CountAllNotifications counts all notifications across all users
+func (s *NotificationService) CountAllNotifications() (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := s.notificationRepo.GetDB().Collection("notifications").CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+// CountAllUnreadNotifications counts all unread notifications across all users
+func (s *NotificationService) CountAllUnreadNotifications() (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := s.notificationRepo.GetDB().Collection("notifications").CountDocuments(ctx, bson.M{"is_read": false})
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+// CountNotificationsByType counts notifications by type
+func (s *NotificationService) CountNotificationsByType(notificationType model.NotificationType) (int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := s.notificationRepo.GetDB().Collection("notifications").CountDocuments(ctx, bson.M{"type": notificationType})
+	if err != nil {
+		return 0, err
+	}
+
+	return int(count), nil
+}
+
+// GetRecentNotifications gets the most recent notifications across all users
+func (s *NotificationService) GetRecentNotifications(limit int) ([]*model.Notification, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetLimit(int64(limit))
+
+	cursor, err := s.notificationRepo.GetDB().Collection("notifications").Find(ctx, bson.M{}, options)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var notifications []*model.Notification
+	if err = cursor.All(ctx, &notifications); err != nil {
+		return nil, err
+	}
+
+	return notifications, nil
+}
+
+// MarkNotificationAsReadByAdmin marks a notification as read (for admin use)
+func (s *NotificationService) MarkNotificationAsReadByAdmin(notificationID int64) error {
+	return s.notificationRepo.MarkAsRead(notificationID)
+}
+
+// DeleteNotificationByAdmin deletes a notification (for admin use)
+func (s *NotificationService) DeleteNotificationByAdmin(notificationID int64) error {
+	return s.notificationRepo.Delete(notificationID)
+}
+
+// internal/service/notification_service.go
+// Add these methods to your notification service
+
+// CreateWithdrawalRequestNotification creates a notification for a withdrawal request
+func (s *NotificationService) CreateWithdrawalRequestNotification(userID int64, amount float64, paymentMethod string) error {
+	title := "Withdrawal Request Submitted"
+	message := fmt.Sprintf("Your withdrawal request for %.2f BDT via %s has been submitted and is pending approval.", amount, paymentMethod)
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeWithdrawal)
+	return err
+}
+
+// CreateDepositNotification creates a notification for a deposit
+func (s *NotificationService) CreateDepositNotification(userID int64, amount float64, method string) error {
+	title := "Deposit Successful"
+	message := fmt.Sprintf("Your deposit of %.2f BDT via %s has been successfully processed and added to your balance.", amount, method)
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeDeposit)
+	return err
+}
+
+// CreateReferralBonusNotification creates a notification for a referral bonus
+func (s *NotificationService) CreateReferralBonusNotification(userID int64, amount float64, referredName string) error {
+	title := "Referral Bonus Received"
+	message := fmt.Sprintf("You have received a referral bonus of %.2f BDT for referring %s.", amount, referredName)
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeBonus)
+	return err
+}
+
+// CreatePlanPurchaseNotification creates a notification for a plan purchase
+func (s *NotificationService) CreatePlanPurchaseNotification(userID int64, planName string, price float64) error {
+	title := "Plan Purchase Successful"
+	message := fmt.Sprintf("You have successfully purchased the %s plan for %.2f BDT.", planName, price)
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
+	return err
+}
+
+// GetUserNotifications gets notifications for a user with pagination and sorting by most recent
+func (s *NotificationService) GetUserNotifications(userID int64, limit, offset int) ([]*model.Notification, error) {
+	return s.notificationRepo.FindByUserID(userID, limit, offset)
+}
+
+// GetUserUnreadCount gets the count of unread notifications for a user
+func (s *NotificationService) GetUserUnreadCount(userID int64) (int, error) {
+	count, err := s.notificationRepo.CountUnreadByUserID(userID)
+	if err != nil {
+		return 0, err
+	}
+	return int(count), nil
+}
+
+// CreateRegistrationNotification creates a notification for new user registration
+func (s *NotificationService) CreateRegistrationNotification(userID int64, name string) error {
+	title := "Welcome to Investment Platform"
+	message := fmt.Sprintf("Welcome, %s! Your account has been successfully created. Complete your profile and KYC verification to unlock all features.", name)
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
+	return err
+}
+
+// CreateKYCSubmissionNotification creates a notification for KYC document submission
+func (s *NotificationService) CreateKYCSubmissionNotification(userID int64) error {
+	title := "KYC Documents Submitted"
+	message := "Your KYC documents have been submitted successfully and are pending verification. We'll notify you once the verification is complete."
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
+	return err
+}
+
+// CreateKYCApprovalNotification creates a notification for KYC approval
+func (s *NotificationService) CreateKYCApprovalNotification(userID int64) error {
+	title := "KYC Verification Approved"
+	message := "Congratulations! Your KYC verification has been approved. You now have full access to all platform features."
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
+	return err
+}
+
+// CreateKYCRejectionNotification creates a notification for KYC rejection
+func (s *NotificationService) CreateKYCRejectionNotification(userID int64, reason string) error {
+	title := "KYC Verification Rejected"
+	message := fmt.Sprintf("Your KYC verification has been rejected. Reason: %s. Please resubmit your documents with the correct information.", reason)
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
+	return err
+}
+
+// CreatePasswordChangeNotification creates a notification for password change
+func (s *NotificationService) CreatePasswordChangeNotification(userID int64) error {
+	title := "Password Changed"
+	message := "Your account password has been changed successfully. If you didn't make this change, please contact support immediately."
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
+	return err
+}
+
+// CreateProfileUpdateNotification creates a notification for profile update
+func (s *NotificationService) CreateProfileUpdateNotification(userID int64) error {
+	title := "Profile Updated"
+	message := "Your profile information has been updated successfully."
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
+	return err
+}
+
+// CreateTaskCompletionNotification creates a notification for task completion
+func (s *NotificationService) CreateTaskCompletionNotification(userID int64, taskName string) error {
+	title := "Task Completed"
+	message := fmt.Sprintf("You have successfully completed the task: %s.", taskName)
+
+	_, err := s.CreateNotification(userID, title, message, model.NotificationTypeSystem)
+	return err
+}
+

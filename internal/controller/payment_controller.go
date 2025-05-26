@@ -349,3 +349,22 @@ func (c *PaymentController) GetPaymentByID(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, response)
 }
+func (c *PaymentController) GetAllPayments(ctx *gin.Context) {
+	// Get pagination parameters
+	limit, offset := getPaginationParams(ctx)
+
+	// Get payments
+	payments, err := c.paymentService.GetAllPayments(limit, offset)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get payments"})
+		return
+	}
+
+	// Convert to response objects
+	paymentResponses := make([]interface{}, 0, len(payments))
+	for _, payment := range payments {
+		paymentResponses = append(paymentResponses, payment.ToResponse())
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"payments": paymentResponses})
+}

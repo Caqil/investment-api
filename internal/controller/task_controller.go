@@ -11,12 +11,17 @@ import (
 )
 
 type TaskController struct {
-	taskService *service.TaskService
+	taskService         *service.TaskService
+	notificationService *service.NotificationService // Add this field
 }
 
-func NewTaskController(taskService *service.TaskService) *TaskController {
+func NewTaskController(
+	taskService *service.TaskService,
+	notificationService *service.NotificationService, // Add this parameter
+) *TaskController {
 	return &TaskController{
-		taskService: taskService,
+		taskService:         taskService,
+		notificationService: notificationService, // Assign the field
 	}
 }
 
@@ -39,6 +44,9 @@ func (c *TaskController) GetAllTasks(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"tasks": tasks})
 }
 
+// internal/controller/task_controller.go
+// Update the CompleteTask method
+
 // CompleteTask marks a task as completed for the user
 func (c *TaskController) CompleteTask(ctx *gin.Context) {
 	// Get user ID from context
@@ -56,11 +64,31 @@ func (c *TaskController) CompleteTask(ctx *gin.Context) {
 		return
 	}
 
+	// Get task information first
+	task, err := c.taskService.GetTaskByID(taskID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get task"})
+		return
+	}
+	if task == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Task not found"})
+		return
+	}
+
 	// Complete the task
 	err = c.taskService.CompleteTask(userID, taskID)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete task: " + err.Error()})
 		return
+	}
+
+	// Create task completion notification
+	if c.notificationService != nil {
+		err = c.notificationService.CreateTaskCompletionNotification(userID, task.Name)
+		if err != nil {
+			// Log error but continue
+			// TODO: Add proper logging
+		}
 	}
 
 	// Check if all mandatory tasks are completed

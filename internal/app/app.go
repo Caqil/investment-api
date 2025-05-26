@@ -99,14 +99,15 @@ func (a *App) SetupRoutes() *gin.Engine {
 
 	kycService := service.NewKYCService(kycRepo, userRepo)
 	notificationService := service.NewNotificationService(notificationRepo, emailService)
+	notificationController := controller.NewNotificationController(notificationService, userService)
 
 	// Initialize controllers
-	authController := controller.NewAuthController(authService, userService, deviceService, planService)
-	userController := controller.NewUserController(userService, bonusService)
+	authController := controller.NewAuthController(authService, userService, deviceService, planService, notificationService)
+	userController := controller.NewUserController(userService, bonusService, notificationService)
 	paymentController := controller.NewPaymentController(paymentService)
-	planController := controller.NewPlanController(planService, userService)
+	planController := controller.NewPlanController(planService, userService, notificationService)
 	withdrawalController := controller.NewWithdrawalController(withdrawalService, taskService, notificationService)
-	taskController := controller.NewTaskController(taskService)
+	taskController := controller.NewTaskController(taskService, notificationService)
 	kycController := controller.NewKYCController(kycService, notificationService, userService)
 	referralController := controller.NewReferralController(userService, bonusService)
 	adminController := controller.NewAdminController(
@@ -129,6 +130,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 	authMiddleware := middleware.NewAuthMiddleware(a.jwtService.GetJWTManager(), userRepo)
 	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService, userService)
 	adminMiddleware := middleware.NewAdminMiddleware(userRepo)
+	userNotificationController := controller.NewUserNotificationController(notificationService)
 
 	// Public routes
 	api := r.Group("/api")
@@ -150,6 +152,11 @@ func (a *App) SetupRoutes() *gin.Engine {
 	protected := api.Group("")
 	protected.Use(authMiddleware.Authenticate())
 	protected.Use(deviceCheckMiddleware.CheckDevice())
+	protected.Group("/notifications").
+		GET("", userNotificationController.GetMyNotifications).
+		GET("/unread-count", userNotificationController.GetUnreadCount).
+		PUT("/:id/read", userNotificationController.MarkAsRead).
+		PUT("/mark-all-read", userNotificationController.MarkAllAsRead)
 	{
 		// User routes
 		user := protected.Group("/user")
@@ -242,17 +249,20 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.PUT("/tasks/:id", adminController.UpdateTask)
 		adminAPI.DELETE("/tasks/:id", adminController.DeleteTask)
 		// Admin notification management
-		adminAPI.POST("/notifications", adminController.SendNotification)
+		adminAPI.GET("/notifications", notificationController.GetAllNotifications)
+		adminAPI.GET("/notifications/stats", notificationController.GetNotificationStats)
+		adminAPI.POST("/notifications", notificationController.SendNotification)
+		adminAPI.PUT("/notifications/:id/read", notificationController.MarkNotificationAsRead)
+		adminAPI.DELETE("/notifications/:id", notificationController.DeleteNotification)
 		adminAPI.GET("/stats", dashboardController.GetDashboardStats)
 		// Admin transactions management
 		adminAPI.GET("/transactions", transactionController.GetAllTransactions)
 		adminAPI.GET("/transactions/recent", transactionController.GetRecentTransactions)
 		adminAPI.GET("/users/:id/transactions", transactionController.GetUserTransactions)
-
+		// Admin payments management
+		adminAPI.GET("/payments", paymentController.GetAllPayments)
 		adminAPI.GET("/payments/stats", paymentController.GetPaymentStats)
-		adminAPI.GET("/payments/:id", paymentController.GetPaymentByID) // Add a method to get payment by ID
-
-		// Ensure these routes exist:
+		adminAPI.GET("/payments/:id", paymentController.GetPaymentByID)
 		adminAPI.GET("/payments/pending", paymentController.GetPendingManualPayments)
 		adminAPI.PUT("/payments/:id/approve", paymentController.ApproveManualPayment)
 		adminAPI.PUT("/payments/:id/reject", paymentController.RejectManualPayment)
