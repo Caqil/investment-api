@@ -79,6 +79,7 @@ export interface KYCDocumentsResponse {
 
 export interface KYCDocumentResponse {
   kyc_document: KYCDocument;
+  user?: User;
   message?: string;
 }
 
@@ -301,6 +302,9 @@ export const api = {
   kyc: {
     getAll: (): Promise<ApiResponse<KYCDocumentsResponse>> => {
       return request<KYCDocumentsResponse>('/admin/kyc');
+    },
+    getById: (id: number): Promise<ApiResponse<KYCDocumentResponse>> => {
+      return request<KYCDocumentResponse>(`/admin/kyc/${id}`);
     },
     getPending: (): Promise<ApiResponse<KYCDocumentsResponse>> => {
       return request<KYCDocumentsResponse>('/admin/kyc?status=pending');

@@ -107,7 +107,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 	planController := controller.NewPlanController(planService, userService)
 	withdrawalController := controller.NewWithdrawalController(withdrawalService, taskService, notificationService)
 	taskController := controller.NewTaskController(taskService)
-	kycController := controller.NewKYCController(kycService, notificationService)
+	kycController := controller.NewKYCController(kycService, notificationService, userService)
 	referralController := controller.NewReferralController(userService, bonusService)
 	adminController := controller.NewAdminController(
 		userService,
@@ -230,7 +230,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.GET("/kyc", adminController.GetAllKYCSubmissions)
 		adminAPI.PUT("/kyc/:id/approve", adminController.ApproveKYC)
 		adminAPI.PUT("/kyc/:id/reject", adminController.RejectKYC)
-
+		adminAPI.GET("/kyc/:id", kycController.GetKYCDocumentByID)
 		// Admin plan management
 		adminAPI.POST("/plans", adminController.CreatePlan)
 		adminAPI.PUT("/plans/:id", adminController.UpdatePlan)

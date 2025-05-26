@@ -13,15 +13,18 @@ import (
 type KYCController struct {
 	kycService          *service.KYCService
 	notificationService *service.NotificationService
+	userService         *service.UserService // Add this field
 }
 
 func NewKYCController(
 	kycService *service.KYCService,
 	notificationService *service.NotificationService,
+	userService *service.UserService, // Add this parameter
 ) *KYCController {
 	return &KYCController{
 		kycService:          kycService,
 		notificationService: notificationService,
+		userService:         userService, // Assign the field
 	}
 }
 
@@ -232,4 +235,41 @@ func (c *KYCController) RejectKYC(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "KYC document rejected successfully"})
+}
+
+// GetKYCDocumentByID gets a KYC document by ID (admin only)
+func (c *KYCController) GetKYCDocumentByID(ctx *gin.Context) {
+	// Get KYC ID from URL parameter
+	kycIDStr := ctx.Param("id")
+	kycID, err := strconv.ParseInt(kycIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid KYC ID"})
+		return
+	}
+
+	// Get KYC document
+	kyc, err := c.kycService.GetKYCByID(kycID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get KYC document"})
+		return
+	}
+	if kyc == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "KYC document not found"})
+		return
+	}
+
+	// Create response
+	response := gin.H{
+		"kyc_document": kyc.ToResponse(),
+	}
+
+	// If user service is available, fetch user details
+	if c.userService != nil {
+		user, err := c.userService.GetUserByID(kyc.UserID)
+		if err == nil && user != nil {
+			response["user"] = user.ToResponse()
+		}
+	}
+
+	ctx.JSON(http.StatusOK, response)
 }

@@ -34,9 +34,7 @@ export function Header({ sidebarOpen, setSidebarOpen }: HeaderProps) {
           <Menu className="h-6 w-6" />
           <span className="sr-only">Toggle sidebar</span>
         </Button>
-        <div className="hidden md:block">
-          <h1 className="text-xl font-bold">Investment App Admin</h1>
-        </div>
+       
       </div>
 
       <div className="flex items-center space-x-3">

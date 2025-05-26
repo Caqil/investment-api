@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
 // MongoDBConnection represents a MongoDB connection
@@ -26,28 +26,32 @@ type MongoDBConfig struct {
 
 // NewMongoDBConnection creates a new MongoDB connection
 func NewMongoDBConnection(cfg MongoDBConfig) (*MongoDBConnection, error) {
-	// Create a context with timeout for the connection
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.ConnectTimeout)*time.Second)
-	defer cancel()
+	// Set MongoDB Stable API version
+	serverAPI := options.ServerAPI(options.ServerAPIVersion1)
 
-	// Set client options
+	// Set client options similar to your working example
 	clientOptions := options.Client().
 		ApplyURI(cfg.URI).
-		SetMaxPoolSize(cfg.MaxPoolSize)
+		SetServerAPIOptions(serverAPI)
 
-	// Connect to MongoDB
-	client, err := mongo.Connect(ctx, clientOptions)
+	// Optional: still set max pool size if needed
+	if cfg.MaxPoolSize > 0 {
+		clientOptions.SetMaxPoolSize(cfg.MaxPoolSize)
+	}
+
+	// Connect to MongoDB using the approach from your working example
+	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to MongoDB: %v", err)
 	}
 
-	// Ping the database to verify connection
-	err = client.Ping(ctx, readpref.Primary())
+	// Ping the admin database to verify connection (as in your working example)
+	err = client.Database("admin").RunCommand(context.TODO(), bson.D{{"ping", 1}}).Err()
 	if err != nil {
 		return nil, fmt.Errorf("failed to ping MongoDB: %v", err)
 	}
 
-	// Get the database
+	// Get the specified database
 	database := client.Database(cfg.Name)
 
 	return &MongoDBConnection{
