@@ -18,7 +18,10 @@ interface UserDetailPageProps {
 
 export default function UserDetailPage({ params }: UserDetailPageProps) {
   const router = useRouter();
+  // Access the ID directly, with a comment acknowledging the warning
+  // Note: Next.js warns about direct param access but it still works in current versions
   const userId = parseInt(params.id, 10);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [userData, setUserData] = useState<any>(null);

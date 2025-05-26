@@ -108,3 +108,28 @@ func (c *TransactionController) GetAllTransactions(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{"transactions": transactionResponses})
 }
+
+// GetRecentTransactions gets recent transactions for the admin dashboard
+func (c *TransactionController) GetRecentTransactions(ctx *gin.Context) {
+	// Get limit parameter (default to 5 if not provided)
+	limitStr := ctx.DefaultQuery("limit", "5")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 5
+	}
+
+	// Get transactions with the specified limit
+	transactions, err := c.transactionRepo.FindAll(limit, 0) // 0 offset to get the most recent
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get transactions"})
+		return
+	}
+
+	// Convert to response objects
+	transactionResponses := make([]interface{}, 0, len(transactions))
+	for _, transaction := range transactions {
+		transactionResponses = append(transactionResponses, transaction.ToResponse())
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"transactions": transactionResponses})
+}

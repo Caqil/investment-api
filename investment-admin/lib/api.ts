@@ -26,7 +26,23 @@ export interface UsersResponse {
 export interface UserResponse {
   user: User;
 }
+export interface CreateUserRequest {
+  name: string;
+  email: string;
+  phone: string;
+  password: string;
+  balance?: number;
+  is_admin?: boolean;
+  is_blocked?: boolean;
+}
 
+export interface UpdateUserRequest {
+  name?: string;
+  phone?: string;
+  balance?: number;
+  is_admin?: boolean;
+  is_blocked?: boolean;
+}
 export interface TransactionsResponse {
   transactions: Transaction[];
 }
@@ -186,6 +202,23 @@ export const api = {
     },
     getById: (id: number): Promise<ApiResponse<UserResponse>> => {
       return request<UserResponse>(`/admin/users/${id}`);
+    },
+    create: (userData: CreateUserRequest): Promise<ApiResponse<UserResponse>> => {
+      return request<UserResponse>('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(userData)
+      });
+    },
+    update: (id: number, userData: UpdateUserRequest): Promise<ApiResponse<UserResponse>> => {
+      return request<UserResponse>(`/admin/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(userData)
+      });
+    },
+    delete: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/users/${id}`, {
+        method: 'DELETE'
+      });
     },
     block: (id: number): Promise<ApiResponse<MessageResponse>> => {
       return request<MessageResponse>(`/admin/users/${id}/block`, { method: 'PUT' });

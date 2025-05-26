@@ -57,7 +57,13 @@ func (r *UserRepository) Create(user *model.User) (*model.User, error) {
 
 	return user, nil
 }
+func (r *UserRepository) Delete(id int64) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
+	_, err := r.collection.DeleteOne(ctx, bson.M{"id": id})
+	return err
+}
 func (r *UserRepository) FindByID(id int64) (*model.User, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

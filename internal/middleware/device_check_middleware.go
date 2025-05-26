@@ -9,11 +9,17 @@ import (
 
 type DeviceCheckMiddleware struct {
 	deviceService *service.DeviceService
+	userService   *service.UserService // Added userService
 }
 
-func NewDeviceCheckMiddleware(deviceService *service.DeviceService) *DeviceCheckMiddleware {
+// Update the constructor to include userService
+func NewDeviceCheckMiddleware(
+	deviceService *service.DeviceService,
+	userService *service.UserService,
+) *DeviceCheckMiddleware {
 	return &DeviceCheckMiddleware{
 		deviceService: deviceService,
+		userService:   userService,
 	}
 }
 
@@ -26,8 +32,44 @@ func (m *DeviceCheckMiddleware) CheckDevice() gin.HandlerFunc {
 			return
 		}
 
+		// Get user to check if they're an admin
+		user, err := m.userService.GetUserByID(userID)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to get user"})
+			return
+		}
+
+		if user == nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User not found"})
+			return
+		}
+
 		// Get device ID from header
 		deviceID := c.GetHeader("X-Device-ID")
+
+		// For admins, handle special case
+		if user.IsAdmin {
+			// Admin users can access without a device ID
+			if deviceID != "" {
+				// If device ID is provided, silently register it if not already registered
+				isUserDevice, err := m.deviceService.IsDeviceRegisteredToUser(deviceID, userID)
+				if err == nil && !isUserDevice {
+					_ = m.deviceService.RegisterDevice(userID, deviceID)
+				}
+
+				// Update last login time for the device
+				_ = m.deviceService.UpdateDeviceLastLogin(deviceID)
+
+				// Add device ID to context
+				c.Set("deviceID", deviceID)
+			}
+
+			// Allow admin to proceed regardless of device
+			c.Next()
+			return
+		}
+
+		// For regular users, enforce device verification
 		if deviceID == "" {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Device ID is required"})
 			return

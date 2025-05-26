@@ -1,4 +1,3 @@
-// src/app/users/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,6 +5,7 @@ import { DashboardShell } from "@/components/layout/dashboard-shell";
 import { api } from "@/lib/api";
 import { User } from "@/types/auth";
 import { formatDate } from "@/lib/utils";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -22,7 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   RefreshCw,
   Search,
-  Shield,
+  UserPlus,
   User as UserIcon,
   UserCheck,
   UserX,
@@ -36,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import Link from "next/link";
+import { toast } from "sonner";
 
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -124,11 +124,18 @@ export default function UsersPage() {
       if (response.error) {
         throw new Error(response.error);
       }
-      // Refresh user list
-      fetchUsers();
+
+      // Update user in the list
+      setUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.id === userId ? { ...user, is_blocked: true } : user
+        )
+      );
+
+      toast.success("User blocked successfully");
     } catch (err) {
       console.error("Error blocking user:", err);
-      setError(err instanceof Error ? err.message : "Failed to block user");
+      toast.error(err instanceof Error ? err.message : "Failed to block user");
     }
   };
 
@@ -138,11 +145,20 @@ export default function UsersPage() {
       if (response.error) {
         throw new Error(response.error);
       }
-      // Refresh user list
-      fetchUsers();
+
+      // Update user in the list
+      setUsers((prevUsers) =>
+        prevUsers.map((user) =>
+          user.id === userId ? { ...user, is_blocked: false } : user
+        )
+      );
+
+      toast.success("User unblocked successfully");
     } catch (err) {
       console.error("Error unblocking user:", err);
-      setError(err instanceof Error ? err.message : "Failed to unblock user");
+      toast.error(
+        err instanceof Error ? err.message : "Failed to unblock user"
+      );
     }
   };
 
@@ -150,10 +166,18 @@ export default function UsersPage() {
     <DashboardShell>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold tracking-tight">Users</h1>
-        <Button onClick={fetchUsers} variant="outline" size="sm">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={fetchUsers} variant="outline" size="sm">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Refresh
+          </Button>
+          <Button asChild>
+            <Link href="/users/create">
+              <UserPlus className="mr-2 h-4 w-4" />
+              Create User
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <Card className="mb-6">

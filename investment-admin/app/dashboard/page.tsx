@@ -100,13 +100,7 @@ export default function DashboardPage() {
       )}
 
       <div className="space-y-8">
-        <DashboardStats
-          totalUsers={totalUsers}
-          activeUsers={activeUsers}
-          pendingWithdrawals={pendingWithdrawals}
-          pendingKyc={pendingKyc}
-          loading={isLoading}
-        />
+        <DashboardStats />
 
         <Separator />
 

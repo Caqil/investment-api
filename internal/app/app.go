@@ -122,10 +122,12 @@ func (a *App) SetupRoutes() *gin.Engine {
 		userService,
 		withdrawalService,
 		kycService,
+		planService,
+		transactionRepo,
 	)
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(a.jwtService.GetJWTManager(), userRepo)
-	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService)
+	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService, userService)
 	adminMiddleware := middleware.NewAdminMiddleware(userRepo)
 
 	// Public routes
@@ -211,11 +213,13 @@ func (a *App) SetupRoutes() *gin.Engine {
 	adminAPI.Use(adminMiddleware.EnsureAdmin())
 	{
 		// Admin user management
+		adminAPI.POST("/users", adminController.CreateUser)
 		adminAPI.GET("/users", adminController.GetAllUsers)
 		adminAPI.GET("/users/:id", adminController.GetUserDetails)
+		adminAPI.PUT("/users/:id", adminController.UpdateUser)
 		adminAPI.PUT("/users/:id/block", adminController.BlockUser)
 		adminAPI.PUT("/users/:id/unblock", adminController.UnblockUser)
-
+		adminAPI.DELETE("/users/:id", adminController.DeleteUser)
 		// Admin withdrawal management
 		adminAPI.GET("/withdrawals", adminController.GetAllWithdrawals)
 		adminAPI.PUT("/withdrawals/:id/approve", adminController.ApproveWithdrawal)
@@ -235,11 +239,14 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.POST("/tasks", adminController.CreateTask)
 		adminAPI.PUT("/tasks/:id", adminController.UpdateTask)
 		adminAPI.DELETE("/tasks/:id", adminController.DeleteTask)
-		adminAPI.GET("/transactions", transactionController.GetAllTransactions)
-		adminAPI.GET("/users/:id/transactions", transactionController.GetUserTransactions) // This is the new route we're adding
 		// Admin notification management
 		adminAPI.POST("/notifications", adminController.SendNotification)
 		adminAPI.GET("/stats", dashboardController.GetDashboardStats)
+		// Admin transactions management
+		adminAPI.GET("/transactions", transactionController.GetAllTransactions)
+		adminAPI.GET("/transactions/recent", transactionController.GetRecentTransactions)
+		adminAPI.GET("/users/:id/transactions", transactionController.GetUserTransactions)
+
 	}
 
 	return r

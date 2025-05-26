@@ -107,6 +107,104 @@ func (c *AdminController) GetUserDetails(ctx *gin.Context) {
 		"referral_count": referralCount,
 	})
 }
+func (c *AdminController) CreateUser(ctx *gin.Context) {
+	var req struct {
+		Name      string  `json:"name" binding:"required"`
+		Email     string  `json:"email" binding:"required,email"`
+		Password  string  `json:"password" binding:"required,min=6"`
+		Phone     string  `json:"phone" binding:"required"`
+		Balance   float64 `json:"balance"`
+		IsAdmin   bool    `json:"is_admin"`
+		IsBlocked bool    `json:"is_blocked"`
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create new user with admin privileges
+	user, err := c.userService.CreateUser(
+		req.Name,
+		req.Email,
+		req.Password,
+		req.Phone,
+		req.Balance,
+		req.IsAdmin,
+		req.IsBlocked,
+	)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user: " + err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusCreated, gin.H{
+		"message": "User created successfully",
+		"user":    user.ToResponse(),
+	})
+}
+
+// UpdateUser updates an existing user (admin only)
+func (c *AdminController) UpdateUser(ctx *gin.Context) {
+	// Get user ID from URL parameter
+	userIDStr := ctx.Param("id")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	var req struct {
+		Name      string  `json:"name"`
+		Phone     string  `json:"phone"`
+		Balance   float64 `json:"balance"`
+		IsAdmin   bool    `json:"is_admin"`
+		IsBlocked bool    `json:"is_blocked"`
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Update user
+	user, err := c.userService.UpdateUserAsAdmin(
+		userID,
+		req.Name,
+		req.Phone,
+		req.Balance,
+		req.IsAdmin,
+		req.IsBlocked,
+	)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user: " + err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"message": "User updated successfully",
+		"user":    user.ToResponse(),
+	})
+}
+
+func (c *AdminController) DeleteUser(ctx *gin.Context) {
+	// Get user ID from URL parameter
+	userIDStr := ctx.Param("id")
+	userID, err := strconv.ParseInt(userIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		return
+	}
+
+	// Delete user
+	err = c.userService.DeleteUser(userID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user: " + err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+}
 
 // BlockUser blocks a user
 func (c *AdminController) BlockUser(ctx *gin.Context) {
