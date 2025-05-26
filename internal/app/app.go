@@ -247,6 +247,14 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.GET("/transactions/recent", transactionController.GetRecentTransactions)
 		adminAPI.GET("/users/:id/transactions", transactionController.GetUserTransactions)
 
+		adminAPI.GET("/payments/stats", paymentController.GetPaymentStats)
+		adminAPI.GET("/payments/:id", paymentController.GetPaymentByID) // Add a method to get payment by ID
+
+		// Ensure these routes exist:
+		adminAPI.GET("/payments/pending", paymentController.GetPendingManualPayments)
+		adminAPI.PUT("/payments/:id/approve", paymentController.ApproveManualPayment)
+		adminAPI.PUT("/payments/:id/reject", paymentController.RejectManualPayment)
+
 	}
 
 	return r

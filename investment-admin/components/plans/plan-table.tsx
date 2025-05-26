@@ -1,4 +1,3 @@
-// components/plans/plans-table.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -16,6 +15,7 @@ import {
   CardHeader,
   CardTitle,
   CardDescription,
+  CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Plus,
@@ -48,12 +47,14 @@ import {
   Check,
   AlertTriangle,
   Loader2,
+  Info,
+  CheckCircle2,
 } from "lucide-react";
 import { Plan } from "@/types/plan";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
-import Link from "next/link";
+import { PlanForm } from "@/components/plans/plan-form";
 
 export function PlansTable() {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -62,8 +63,11 @@ export function PlansTable() {
   const [searchQuery, setSearchQuery] = useState("");
   const [deletePlanId, setDeletePlanId] = useState<number | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [deletingPlan, setDeletingPlan] = useState(false);
-  const [settingDefault, setSettingDefault] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const fetchPlans = async () => {
     setLoading(true);
@@ -104,10 +108,19 @@ export function PlansTable() {
     plan.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleEditPlan = (plan: Plan) => {
+    setSelectedPlan(plan);
+    setShowEditDialog(true);
+  };
+
+  const handleCreatePlan = () => {
+    setShowCreateDialog(true);
+  };
+
   const handleDeletePlan = async () => {
     if (!deletePlanId) return;
 
-    setDeletingPlan(true);
+    setIsSubmitting(true);
     try {
       const response = await api.plans.delete(deletePlanId);
 
@@ -122,14 +135,14 @@ export function PlansTable() {
       console.error("Error deleting plan:", err);
       toast.error(err instanceof Error ? err.message : "Failed to delete plan");
     } finally {
-      setDeletingPlan(false);
+      setIsSubmitting(false);
       setShowDeleteDialog(false);
       setDeletePlanId(null);
     }
   };
 
   const handleSetDefaultPlan = async (planId: number) => {
-    setSettingDefault(true);
+    setIsSubmitting(true);
     try {
       // Find the plan to update
       const planToUpdate = plans.find((plan) => plan.id === planId);
@@ -137,7 +150,11 @@ export function PlansTable() {
 
       // Call the API to update the plan
       const response = await api.plans.update(planId, {
-        ...planToUpdate,
+        name: planToUpdate.name,
+        daily_deposit_limit: planToUpdate.daily_deposit_limit,
+        daily_withdrawal_limit: planToUpdate.daily_withdrawal_limit,
+        daily_profit_limit: planToUpdate.daily_profit_limit,
+        price: planToUpdate.price,
         is_default: true,
       });
 
@@ -160,7 +177,87 @@ export function PlansTable() {
         err instanceof Error ? err.message : "Failed to set default plan"
       );
     } finally {
-      setSettingDefault(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitCreatePlan = async (planData: any) => {
+    setIsSubmitting(true);
+    setFormError(null);
+
+    try {
+      const response = await api.plans.create({
+        name: planData.name,
+        daily_deposit_limit: planData.daily_deposit_limit,
+        daily_withdrawal_limit: planData.daily_withdrawal_limit,
+        daily_profit_limit: planData.daily_profit_limit,
+        price: planData.price,
+        is_default: planData.is_default,
+      });
+
+      if (response.error) {
+        setFormError(response.error);
+        return false;
+      }
+
+      // Add the new plan to the state
+      await fetchPlans();
+      toast.success("Plan created successfully");
+      setShowCreateDialog(false);
+      return true;
+    } catch (err) {
+      console.error("Error creating plan:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to create plan";
+      setFormError(errorMessage);
+      return false;
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmitEditPlan = async (planData: any) => {
+    if (!selectedPlan) return false;
+
+    setIsSubmitting(true);
+    setFormError(null);
+
+    try {
+      const response = await api.plans.update(selectedPlan.id, {
+        name: planData.name,
+        daily_deposit_limit: planData.daily_deposit_limit,
+        daily_withdrawal_limit: planData.daily_withdrawal_limit,
+        daily_profit_limit: planData.daily_profit_limit,
+        price: planData.price,
+        is_default: planData.is_default,
+      });
+
+      if (response.error) {
+        setFormError(response.error);
+        return false;
+      }
+
+      // Update the plan in the state
+      const updatedPlans = plans.map((plan) =>
+        plan.id === selectedPlan.id
+          ? { ...plan, ...planData }
+          : planData.is_default
+          ? { ...plan, is_default: false }
+          : plan
+      );
+      setPlans(updatedPlans);
+
+      toast.success("Plan updated successfully");
+      setShowEditDialog(false);
+      return true;
+    } catch (err) {
+      console.error("Error updating plan:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to update plan";
+      setFormError(errorMessage);
+      return false;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -186,8 +283,9 @@ export function PlansTable() {
       </CardHeader>
       <CardContent>
         {error && (
-          <div className="bg-destructive/10 text-destructive p-4 rounded-md mb-4">
-            {error}
+          <div className="bg-destructive/10 text-destructive p-4 rounded-md mb-4 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            <p>{error}</p>
           </div>
         )}
 
@@ -258,10 +356,11 @@ export function PlansTable() {
                             variant="outline"
                             className="bg-green-50 text-green-700 border-green-200"
                           >
-                            Default Plan
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Default
                           </Badge>
                         ) : (
-                          <Badge variant="outline">Standard Plan</Badge>
+                          <Badge variant="outline">Standard</Badge>
                         )}
                       </TableCell>
                       <TableCell className="text-right">
@@ -271,6 +370,7 @@ export function PlansTable() {
                               variant="ghost"
                               size="sm"
                               className="h-8 w-8 p-0"
+                              disabled={isSubmitting}
                             >
                               <MoreHorizontal className="h-4 w-4" />
                               <span className="sr-only">Open menu</span>
@@ -279,16 +379,16 @@ export function PlansTable() {
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem asChild>
-                              <Link href={`/plans/${plan.id}/edit`}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Edit Plan
-                              </Link>
+                            <DropdownMenuItem
+                              onClick={() => handleEditPlan(plan)}
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Plan
                             </DropdownMenuItem>
                             {!plan.is_default && (
                               <DropdownMenuItem
                                 onClick={() => handleSetDefaultPlan(plan.id)}
-                                disabled={settingDefault}
+                                disabled={isSubmitting}
                               >
                                 <Check className="h-4 w-4 mr-2" />
                                 Set as Default
@@ -301,6 +401,7 @@ export function PlansTable() {
                                   setShowDeleteDialog(true);
                                 }}
                                 className="text-destructive"
+                                disabled={isSubmitting}
                               >
                                 <Trash className="h-4 w-4 mr-2" />
                                 Delete Plan
@@ -313,8 +414,25 @@ export function PlansTable() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-4">
-                      No plans found
+                    <TableCell colSpan={7} className="text-center py-8">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <Info className="h-8 w-8 text-muted-foreground" />
+                        <p className="text-muted-foreground">No plans found</p>
+                        {searchQuery && (
+                          <p className="text-sm text-muted-foreground">
+                            Try adjusting your search query
+                          </p>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCreatePlan}
+                          className="mt-2"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add New Plan
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 )}
@@ -323,6 +441,63 @@ export function PlansTable() {
           </div>
         )}
       </CardContent>
+      {filteredPlans.length > 0 && (
+        <CardFooter className="flex justify-between border-t p-4">
+          <div className="text-sm text-muted-foreground">
+            {filteredPlans.length}{" "}
+            {filteredPlans.length === 1 ? "plan" : "plans"} found
+          </div>
+          <Button variant="outline" size="sm" onClick={handleCreatePlan}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add New Plan
+          </Button>
+        </CardFooter>
+      )}
+
+      {/* Create Plan Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Create New Plan</DialogTitle>
+            <DialogDescription>
+              Add a new subscription plan for your users.
+            </DialogDescription>
+          </DialogHeader>
+          {formError && (
+            <div className="p-3 text-sm bg-red-50 border border-red-200 text-red-600 rounded-md">
+              {formError}
+            </div>
+          )}
+          <PlanForm
+            onSubmit={handleSubmitCreatePlan}
+            onCancel={() => setShowCreateDialog(false)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Plan Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Edit Plan</DialogTitle>
+            <DialogDescription>
+              Update the details of {selectedPlan?.name} plan.
+            </DialogDescription>
+          </DialogHeader>
+          {formError && (
+            <div className="p-3 text-sm bg-red-50 border border-red-200 text-red-600 rounded-md">
+              {formError}
+            </div>
+          )}
+          {selectedPlan && (
+            <PlanForm
+              initialData={selectedPlan}
+              onSubmit={handleSubmitEditPlan}
+              onCancel={() => setShowEditDialog(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Plan Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -342,16 +517,16 @@ export function PlansTable() {
             <Button
               variant="outline"
               onClick={() => setShowDeleteDialog(false)}
-              disabled={deletingPlan}
+              disabled={isSubmitting}
             >
               Cancel
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeletePlan}
-              disabled={deletingPlan}
+              disabled={isSubmitting}
             >
-              {deletingPlan ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Deleting...

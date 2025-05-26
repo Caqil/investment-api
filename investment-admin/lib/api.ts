@@ -297,8 +297,14 @@ export const api = {
   
   // Payment endpoints
   payments: {
+    getAll: (): Promise<ApiResponse<PaymentsResponse>> => {
+      return request<PaymentsResponse>('/admin/payments');
+    },
     getPending: (): Promise<ApiResponse<PaymentsResponse>> => {
       return request<PaymentsResponse>('/admin/payments/pending');
+    },
+    getById: (id: number): Promise<ApiResponse<PaymentResponse>> => {
+      return request<PaymentResponse>(`/admin/payments/${id}`);
     },
     approve: (id: number): Promise<ApiResponse<MessageResponse>> => {
       return request<MessageResponse>(`/admin/payments/${id}/approve`, {
@@ -310,6 +316,15 @@ export const api = {
         method: 'PUT',
         body: JSON.stringify({ reason })
       });
+    },
+    getStats: (): Promise<ApiResponse<{
+      total_payments: number;
+      total_amount: number;
+      pending_count: number;
+      completed_count: number;
+      failed_count: number;
+    }>> => {
+      return request<any>('/admin/payments/stats');
     }
   },
   

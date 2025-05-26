@@ -575,3 +575,73 @@ func (s *PaymentService) GetPendingManualPayments(limit, offset int) ([]*model.P
 		offset,
 	)
 }
+
+// CountAllPayments counts all payments
+func (s *PaymentService) CountAllPayments() (int64, error) {
+	// Get all payments from repository without pagination
+	payments, err := s.paymentRepo.FindAll(0, 0)
+	if err != nil {
+		return 0, err
+	}
+
+	return int64(len(payments)), nil
+}
+
+// CountPaymentsByStatus counts payments by status
+func (s *PaymentService) CountPaymentsByStatus(status model.PaymentStatus) (int64, error) {
+	return s.paymentRepo.CountByStatus(status)
+}
+
+// CountPaymentsByGateway counts payments by gateway
+func (s *PaymentService) CountPaymentsByGateway(gateway model.PaymentGateway) (int64, error) {
+	return s.paymentRepo.CountByGateway(gateway)
+}
+
+// GetTotalCompletedAmount calculates the total amount of completed payments
+func (s *PaymentService) GetTotalCompletedAmount() (float64, error) {
+	// Get completed payments
+	payments, err := s.paymentRepo.FindByStatus(model.PaymentStatusCompleted, 0, 0)
+	if err != nil {
+		return 0, err
+	}
+
+	// Calculate total amount
+	var totalAmount float64
+	for _, payment := range payments {
+		// Convert currency if needed
+		if payment.Currency == model.CurrencyUSD {
+			// Use the conversion rate from config
+			totalAmount += payment.Amount * 120 // assuming 1 USD = 120 BDT
+		} else {
+			totalAmount += payment.Amount
+		}
+	}
+
+	return totalAmount, nil
+}
+
+// GetRecentPayments gets the most recent payments
+func (s *PaymentService) GetRecentPayments(limit int) ([]*model.Payment, error) {
+	// Get recent payments with sorting by created_at desc
+	return s.paymentRepo.FindRecent(limit)
+}
+
+// GetTransactionByPaymentID gets the transaction associated with a payment
+func (s *PaymentService) GetTransactionByPaymentID(paymentID int64) (*model.Transaction, error) {
+	// Get payment
+	payment, err := s.GetPaymentByID(paymentID)
+	if err != nil {
+		return nil, err
+	}
+	if payment == nil {
+		return nil, errors.New("payment not found")
+	}
+
+	// Get transaction
+	transaction, err := s.transactionRepo.FindByID(payment.TransactionID)
+	if err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
+}

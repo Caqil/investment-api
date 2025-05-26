@@ -191,3 +191,109 @@ func (r *PaymentRepository) CountByGatewayAndStatus(gateway model.PaymentGateway
 
 	return count, nil
 }
+
+// CountByStatus counts payments by status
+func (r *PaymentRepository) CountByStatus(status model.PaymentStatus) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{"status": status})
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// CountByGateway counts payments by gateway
+func (r *PaymentRepository) CountByGateway(gateway model.PaymentGateway) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	count, err := r.collection.CountDocuments(ctx, bson.M{"gateway": gateway})
+	if err != nil {
+		return 0, err
+	}
+
+	return count, nil
+}
+
+// FindByStatus finds payments by status
+func (r *PaymentRepository) FindByStatus(status model.PaymentStatus, limit, offset int) ([]*model.Payment, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{"status": status}, options)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var payments []*model.Payment
+	if err = cursor.All(ctx, &payments); err != nil {
+		return nil, err
+	}
+
+	return payments, nil
+}
+
+// FindRecent finds the most recent payments
+func (r *PaymentRepository) FindRecent(limit int) ([]*model.Payment, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}})
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{}, options)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var payments []*model.Payment
+	if err = cursor.All(ctx, &payments); err != nil {
+		return nil, err
+	}
+
+	return payments, nil
+}
+
+// FindAll finds all payments
+func (r *PaymentRepository) FindAll(limit, offset int) ([]*model.Payment, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	options := options.Find().
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetSkip(int64(offset))
+
+	if limit > 0 {
+		options.SetLimit(int64(limit))
+	}
+
+	cursor, err := r.collection.Find(ctx, bson.M{}, options)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var payments []*model.Payment
+	if err = cursor.All(ctx, &payments); err != nil {
+		return nil, err
+	}
+
+	return payments, nil
+}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/Caqil/investment-api/internal/middleware"
 	"github.com/Caqil/investment-api/internal/model"
@@ -225,4 +226,126 @@ func (c *PaymentController) GetPendingManualPayments(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"payments": paymentResponses})
+}
+
+// Add this method to your PaymentController in internal/controller/payment_controller.go
+
+// GetPaymentStats gets payment statistics for the admin dashboard
+func (c *PaymentController) GetPaymentStats(ctx *gin.Context) {
+	// Count total payments
+	totalPayments, err := c.paymentService.CountAllPayments()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count payments"})
+		return
+	}
+
+	// Count payments by status
+	pendingCount, err := c.paymentService.CountPaymentsByStatus(model.PaymentStatusPending)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count pending payments"})
+		return
+	}
+
+	completedCount, err := c.paymentService.CountPaymentsByStatus(model.PaymentStatusCompleted)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count completed payments"})
+		return
+	}
+
+	failedCount, err := c.paymentService.CountPaymentsByStatus(model.PaymentStatusFailed)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count failed payments"})
+		return
+	}
+
+	// Count payments by gateway
+	manualCount, err := c.paymentService.CountPaymentsByGateway(model.PaymentGatewayManual)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count manual payments"})
+		return
+	}
+
+	coinGateCount, err := c.paymentService.CountPaymentsByGateway(model.PaymentGatewayCoingate)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count CoinGate payments"})
+		return
+	}
+
+	uddoktaPayCount, err := c.paymentService.CountPaymentsByGateway(model.PaymentGatewayUddoktaPay)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count UddoktaPay payments"})
+		return
+	}
+
+	// Calculate total amount
+	totalAmount, err := c.paymentService.GetTotalCompletedAmount()
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to calculate total amount"})
+		return
+	}
+
+	// Get recent payments (limit to 5)
+	recentPayments, err := c.paymentService.GetRecentPayments(5)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get recent payments"})
+		return
+	}
+
+	// Convert recent payments to response objects
+	recentPaymentResponses := make([]interface{}, 0, len(recentPayments))
+	for _, payment := range recentPayments {
+		recentPaymentResponses = append(recentPaymentResponses, payment.ToResponse())
+	}
+
+	// Return statistics
+	ctx.JSON(http.StatusOK, gin.H{
+		"total_payments":   totalPayments,
+		"pending_count":    pendingCount,
+		"completed_count":  completedCount,
+		"failed_count":     failedCount,
+		"manual_count":     manualCount,
+		"coingate_count":   coinGateCount,
+		"uddoktapay_count": uddoktaPayCount,
+		"total_amount":     totalAmount,
+		"recent_payments":  recentPaymentResponses,
+	})
+}
+func (c *PaymentController) GetPaymentByID(ctx *gin.Context) {
+	// Get payment ID from URL parameter
+	paymentIDStr := ctx.Param("id")
+	paymentID, err := strconv.ParseInt(paymentIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid payment ID"})
+		return
+	}
+
+	// Get payment
+	payment, err := c.paymentService.GetPaymentByID(paymentID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get payment"})
+		return
+	}
+	if payment == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Payment not found"})
+		return
+	}
+
+	// Get associated transaction
+	transaction, err := c.paymentService.GetTransactionByPaymentID(paymentID)
+	if err != nil {
+		// Log error but continue
+		// TODO: Add proper logging
+	}
+
+	// Create response
+	response := gin.H{
+		"payment": payment.ToResponse(),
+	}
+
+	// Add transaction to response if available
+	if transaction != nil {
+		response["transaction"] = transaction.ToResponse()
+	}
+
+	ctx.JSON(http.StatusOK, response)
 }
