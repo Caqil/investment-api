@@ -14,6 +14,7 @@ type WithdrawalController struct {
 	withdrawalService   *service.WithdrawalService
 	taskService         *service.TaskService
 	notificationService *service.NotificationService
+	userService         *service.UserService
 }
 
 func NewWithdrawalController(
@@ -154,6 +155,86 @@ func (c *WithdrawalController) GetAllWithdrawals(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"withdrawals": withdrawalResponses})
+}
+
+// GetWithdrawalByID gets a withdrawal by ID
+func (c *WithdrawalController) GetWithdrawalByID(ctx *gin.Context) {
+	// Get withdrawal ID from URL parameter
+	withdrawalIDStr := ctx.Param("id")
+	withdrawalID, err := strconv.ParseInt(withdrawalIDStr, 10, 64)
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid withdrawal ID"})
+		return
+	}
+
+	// Get withdrawal
+	withdrawal, err := c.withdrawalService.GetWithdrawalByID(withdrawalID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get withdrawal"})
+		return
+	}
+	if withdrawal == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Withdrawal not found"})
+		return
+	}
+
+	// Get user information
+	user, err := c.userService.GetUserByID(withdrawal.UserID)
+	if err != nil {
+		// Log error but continue
+	}
+
+	response := gin.H{
+		"withdrawal": withdrawal.ToResponse(),
+	}
+
+	if user != nil {
+		response["user"] = user.ToResponse()
+	}
+
+	ctx.JSON(http.StatusOK, response)
+}
+
+// GetWithdrawalStats gets withdrawal statistics
+func (c *WithdrawalController) GetWithdrawalStats(ctx *gin.Context) {
+	// Get counts for different statuses
+	pendingCount, err := c.withdrawalService.GetTotalWithdrawalsByStatus(model.WithdrawalStatusPending)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get pending count"})
+		return
+	}
+
+	approvedCount, err := c.withdrawalService.GetTotalWithdrawalsByStatus(model.WithdrawalStatusApproved)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get approved count"})
+		return
+	}
+
+	rejectedCount, err := c.withdrawalService.GetTotalWithdrawalsByStatus(model.WithdrawalStatusRejected)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get rejected count"})
+		return
+	}
+
+	// Get recent withdrawals
+	recentWithdrawals, err := c.withdrawalService.GetWithdrawalsByStatus(model.WithdrawalStatusPending, 5, 0)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get recent withdrawals"})
+		return
+	}
+
+	// Convert to response objects
+	withdrawalResponses := make([]interface{}, 0, len(recentWithdrawals))
+	for _, withdrawal := range recentWithdrawals {
+		withdrawalResponses = append(withdrawalResponses, withdrawal.ToResponse())
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{
+		"pending_count":      pendingCount,
+		"approved_count":     approvedCount,
+		"rejected_count":     rejectedCount,
+		"recent_withdrawals": withdrawalResponses,
+	})
 }
 
 // ApproveWithdrawal approves a withdrawal (admin only)

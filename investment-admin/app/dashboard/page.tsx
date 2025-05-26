@@ -13,7 +13,7 @@ import {
 } from "@/hooks/use-dashboard-data";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PendingActions } from "@/components/dashboard/pending-action";
-import { RecentUsers } from "@/components/users/recen-user";
+import { RecentUsers } from "@/components/users/recent-user";
 import { api } from "@/lib/api";
 import { Transaction } from "@/types/transaction";
 

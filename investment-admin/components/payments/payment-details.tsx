@@ -1,7 +1,7 @@
 // investment-admin/components/payments/payment-details.tsx
 import { useState, useEffect } from "react";
 import { Payment, PaymentStatus, PaymentGateway } from "@/types/payment";
-import { Transaction } from "@/types/transaction";
+import { Transaction, TransactionType } from "@/types/transaction";
 import { api } from "@/lib/api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import {
@@ -59,38 +59,24 @@ export function PaymentDetails({
     setError(null);
 
     try {
-      // In a real implementation, you would have an API endpoint to get payment details by ID
-      // For now, we'll simulate this with the existing endpoints
-      const pendingResponse = await api.payments.getPending();
+      // Use the actual API endpoint to get payment details by ID
+      const response = await api.payments.getById(paymentId);
 
-      if (pendingResponse.error) {
-        throw new Error(pendingResponse.error);
+      if (response.error) {
+        throw new Error(response.error);
       }
 
-      const payments = pendingResponse.data?.payments || [];
-      const foundPayment = payments.find((p) => p.id === paymentId);
+      // Extract payment from the response data
+      const responseData = response.data;
+      if (!responseData || !responseData.payment) {
+        throw new Error("Payment not found");
+      }
 
-      if (foundPayment) {
-        setPayment(foundPayment);
+      setPayment(responseData.payment);
 
-        // Fetch transaction details if needed
-        // This would typically be a separate API call
-        // For now, we'll just create a mock transaction
-        setTransaction({
-          id: foundPayment.transaction_id,
-          amount: foundPayment.amount,
-          type: "deposit",
-          status:
-            foundPayment.status === PaymentStatus.COMPLETED
-              ? "completed"
-              : foundPayment.status === PaymentStatus.FAILED
-              ? "rejected"
-              : "pending",
-          description: `Deposit via ${foundPayment.gateway}`,
-          created_at: foundPayment.created_at,
-        });
-      } else {
-        setError("Payment not found");
+      // Check if transaction exists in the response
+      if (responseData.transaction) {
+        setTransaction(responseData.transaction);
       }
     } catch (err) {
       console.error("Error fetching payment details:", err);

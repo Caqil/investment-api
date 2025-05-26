@@ -224,7 +224,8 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.GET("/withdrawals", adminController.GetAllWithdrawals)
 		adminAPI.PUT("/withdrawals/:id/approve", adminController.ApproveWithdrawal)
 		adminAPI.PUT("/withdrawals/:id/reject", adminController.RejectWithdrawal)
-
+		adminAPI.GET("/withdrawals/:id", withdrawalController.GetWithdrawalByID)
+		adminAPI.GET("/withdrawals/stats", withdrawalController.GetWithdrawalStats)
 		// Admin KYC management
 		adminAPI.GET("/kyc", adminController.GetAllKYCSubmissions)
 		adminAPI.PUT("/kyc/:id/approve", adminController.ApproveKYC)

@@ -26,6 +26,13 @@ export interface UsersResponse {
 export interface UserResponse {
   user: User;
 }
+export interface UserStatsResponse {
+  total_users: number;
+  active_users: number;
+  blocked_users: number;
+  verified_users: number;
+  plan_distribution: Array<{name: string; value: number}>;
+}
 export interface CreateUserRequest {
   name: string;
   email: string;
@@ -62,6 +69,7 @@ export interface WithdrawalsResponse {
 
 export interface WithdrawalResponse {
   withdrawal: Withdrawal;
+  user: User;
   message?: string;
 }
 
@@ -80,6 +88,7 @@ export interface PaymentsResponse {
 
 export interface PaymentResponse {
   payment: Payment;
+  transaction?: Transaction;
   message?: string;
 }
 
@@ -225,7 +234,10 @@ export const api = {
     },
     unblock: (id: number): Promise<ApiResponse<MessageResponse>> => {
       return request<MessageResponse>(`/admin/users/${id}/unblock`, { method: 'PUT' });
-    }
+    },
+    getStats: (): Promise<ApiResponse<UserStatsResponse>> => {
+      return request<UserStatsResponse>('/admin/users/stats');
+    },
   },
   
   // Plan endpoints
@@ -257,8 +269,19 @@ export const api = {
     getAll: (): Promise<ApiResponse<WithdrawalsResponse>> => {
       return request<WithdrawalsResponse>('/admin/withdrawals');
     },
+    getById: (id: number): Promise<ApiResponse<WithdrawalResponse>> => {
+      return request<WithdrawalResponse>(`/admin/withdrawals/${id}`);
+    },
     getPending: (): Promise<ApiResponse<WithdrawalsResponse>> => {
       return request<WithdrawalsResponse>('/admin/withdrawals?status=pending');
+    },
+    getStats: (): Promise<ApiResponse<{
+      pending_count: number;
+      approved_count: number;
+      rejected_count: number;
+      recent_withdrawals: Withdrawal[];
+    }>> => {
+      return request<any>('/admin/withdrawals/stats');
     },
     approve: (id: number, adminNote: string): Promise<ApiResponse<MessageResponse>> => {
       return request<MessageResponse>(`/admin/withdrawals/${id}/approve`, {
