@@ -441,13 +441,29 @@ notifications: {
     });
   },
 },
+
 userNotifications: {
   getAll: (limit = 10, offset = 0): Promise<ApiResponse<{ notifications: Notification[]; unread_count: number }>> => {
     return request<{ notifications: Notification[]; unread_count: number }>(`/notifications?limit=${limit}&offset=${offset}`);
   },
   
   getUnreadCount: (): Promise<ApiResponse<{ unread_count: number }>> => {
-    return request<{ unread_count: number }>('/notifications/unread-count');
+    // Make sure the token is included in the request headers
+    const token = getToken();
+    if (!token) {
+      return Promise.resolve({ error: 'No authentication token' });
+    }
+    
+    // Check for non-standard device ID requirement
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${token}`,
+      // If your API requires a device ID, add it here
+      'X-Device-ID': 'web-admin-dashboard' // Use a consistent value for the admin dashboard
+    };
+    
+    return request<{ unread_count: number }>('/notifications/unread-count', {
+      headers
+    });
   },
   
   markAsRead: (id: number): Promise<ApiResponse<MessageResponse>> => {
@@ -462,4 +478,5 @@ userNotifications: {
     });
   },
 },
+
 };

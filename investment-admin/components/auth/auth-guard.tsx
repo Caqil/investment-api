@@ -10,13 +10,19 @@ interface AuthGuardProps {
   children: React.ReactNode;
 }
 
-const PUBLIC_PATHS = ["/login"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+];
 
 export function AuthGuard({ children }: AuthGuardProps) {
   const { user, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [shouldRender, setShouldRender] = useState(false);
 
   const isPublicPath = PUBLIC_PATHS.includes(pathname || "");
 
@@ -24,18 +30,32 @@ export function AuthGuard({ children }: AuthGuardProps) {
     // Skip for public paths - they don't need auth
     if (isPublicPath) {
       setIsCheckingAuth(false);
+      setShouldRender(true);
       return;
     }
 
-    // Check authentication status directly from localStorage
+    // Check authentication status
     const authStatus = isAuthenticated();
 
     if (!authStatus) {
+      // Don't redirect directly in render phase
+      // Instead, schedule it for the next tick
       router.push("/login");
+    } else {
+      setShouldRender(true);
     }
 
     setIsCheckingAuth(false);
   }, [isPublicPath, pathname, router]);
+
+  // Handle redirecting already logged-in users from public paths
+  useEffect(() => {
+    if (isPublicPath && user && !loading) {
+      // Redirect to appropriate dashboard based on user role
+      const redirectPath = user.is_admin ? "/dashboard" : "/user/dashboard";
+      router.push(redirectPath);
+    }
+  }, [isPublicPath, user, loading, router]);
 
   // Show loading state while checking authentication
   if (isCheckingAuth || loading) {
@@ -49,9 +69,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  // If on a public path and already logged in, redirect to dashboard
+  // If on a public path and redirecting, show loading
   if (isPublicPath && user) {
-    router.push("/dashboard");
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -59,6 +78,6 @@ export function AuthGuard({ children }: AuthGuardProps) {
     );
   }
 
-  // For public paths or if user is authenticated for protected paths
-  return <>{children}</>;
+  // Only render children if we've completed auth checks and should render
+  return shouldRender ? <>{children}</> : null;
 }
