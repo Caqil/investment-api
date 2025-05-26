@@ -15,6 +15,7 @@ type PaymentService struct {
 	paymentRepo     *repository.PaymentRepository
 	transactionRepo *repository.TransactionRepository
 	userRepo        *repository.UserRepository
+	settingService  *SettingService
 	config          struct {
 		CoinGateAPIKey    string
 		UddoktaPayAPIKey  string
@@ -26,6 +27,7 @@ func NewPaymentService(
 	paymentRepo *repository.PaymentRepository,
 	transactionRepo *repository.TransactionRepository,
 	userRepo *repository.UserRepository,
+	settingService *SettingService,
 	config struct {
 		CoinGateAPIKey    string
 		UddoktaPayAPIKey  string
@@ -36,6 +38,7 @@ func NewPaymentService(
 		paymentRepo:     paymentRepo,
 		transactionRepo: transactionRepo,
 		userRepo:        userRepo,
+		settingService:  settingService,
 		config:          config,
 	}
 }
@@ -75,10 +78,22 @@ func (s *PaymentService) CreatePayment(
 
 // InitiateCoingatePayment initiates a payment via Coingate
 func (s *PaymentService) InitiateCoingatePayment(userID int64, amountUSD float64) (string, *model.Payment, error) {
+	// Check if deposits are enabled
+	depositsEnabled, err := s.settingService.GetSettingValueBool("enable_deposits")
+	if err == nil && !depositsEnabled {
+		return "", nil, errors.New("deposits are currently disabled")
+	}
+
+	// Get USD to BDT conversion rate from settings
+	usdToBdtRate, err := s.settingService.GetSettingValueFloat("usd_to_bdt_rate")
+	if err != nil {
+		usdToBdtRate = 120.0 // Default to 120 if setting not found
+	}
+
 	// Create deposit transaction
 	transaction, err := s.CreateDepositTransaction(
 		userID,
-		amountUSD*120, // Convert USD to BDT
+		amountUSD*usdToBdtRate, // Convert USD to BDT using the rate from settings
 		fmt.Sprintf("Deposit via CoinGate (%.2f USD)", amountUSD),
 	)
 	if err != nil {

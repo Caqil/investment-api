@@ -24,7 +24,12 @@ func main() {
 	cfg := config.NewConfig()
 
 	// Connect to MongoDB
-	mongoConn, err := database.NewMongoDBConnection(cfg.Database)
+	mongoConn, err := database.NewMongoDBConnection(database.MongoDBConfig{
+		URI:            cfg.Database.URI,
+		Name:           cfg.Database.Name,
+		ConnectTimeout: cfg.Database.ConnectTimeout,
+		MaxPoolSize:    cfg.Database.MaxPoolSize,
+	})
 	if err != nil {
 		log.Fatalf("Failed to connect to MongoDB: %v", err)
 	}
@@ -34,28 +39,21 @@ func main() {
 	userRepo := repository.NewUserRepository(mongoConn)
 	transactionRepo := repository.NewTransactionRepository(mongoConn)
 	notificationRepo := repository.NewNotificationRepository(mongoConn)
+	settingRepo := repository.NewSettingRepository(mongoConn)
 
-	// Initialize bonus service
+	// Initialize settings service
+	settingService := service.NewSettingService(settingRepo)
+
+	// Initialize bonus service with settings
 	bonusService := service.NewBonusService(
 		userRepo,
 		transactionRepo,
-		struct {
-			DailyBonusPercentage     float64
-			ReferralBonusAmount      float64
-			ReferralProfitPercentage float64
-		}{
-			DailyBonusPercentage:     cfg.App.DailyBonusPercentage,
-			ReferralBonusAmount:      cfg.App.ReferralBonusAmount,
-			ReferralProfitPercentage: cfg.App.ReferralProfitPercentage,
-		},
+		notificationRepo,
+		settingService,
 	)
 
-	// Set the notification repository in the bonus service
-	bonusService.SetNotificationRepo(notificationRepo)
-
 	// Set up scheduled tasks
-	cronManager := cron.NewCronManager(bonusService)
-	cronManager.Start()
+	cronManager := cron.InitScheduledTasks(bonusService, settingService)
 
 	// Log start message
 	log.Println("Scheduler started successfully")
@@ -77,24 +75,18 @@ func addDailyBonusJob(mongoConn *database.MongoDBConnection, cfg *config.Config)
 	userRepo := repository.NewUserRepository(mongoConn)
 	transactionRepo := repository.NewTransactionRepository(mongoConn)
 	notificationRepo := repository.NewNotificationRepository(mongoConn)
+	settingRepo := repository.NewSettingRepository(mongoConn)
+
+	// Initialize settings service
+	settingService := service.NewSettingService(settingRepo)
 
 	// Initialize bonus service
 	bonusService := service.NewBonusService(
 		userRepo,
 		transactionRepo,
-		struct {
-			DailyBonusPercentage     float64
-			ReferralBonusAmount      float64
-			ReferralProfitPercentage float64
-		}{
-			DailyBonusPercentage:     cfg.App.DailyBonusPercentage,
-			ReferralBonusAmount:      cfg.App.ReferralBonusAmount,
-			ReferralProfitPercentage: cfg.App.ReferralProfitPercentage,
-		},
+		notificationRepo,
+		settingService,
 	)
-
-	// Set the notification repository in the bonus service
-	bonusService.SetNotificationRepo(notificationRepo)
 
 	log.Println("Starting manual daily bonus calculation...")
 	err := bonusService.CalculateDailyBonusForAllUsers()

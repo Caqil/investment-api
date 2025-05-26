@@ -8,6 +8,7 @@ import { Payment } from '../types/payment';
 import { Task } from '../types/task';
 import { Notification, NotificationStats } from '../types/notification';
 import { getToken } from './auth';
+import { AppSettings, Setting } from '@/types/setting';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
 
@@ -128,6 +129,19 @@ export interface StatsResponse {
   recent_users: User[];
   recent_withdrawals: Withdrawal[];
   plan_distribution: Array<{name: string; value: number}>;
+}
+
+export interface SettingsResponse {
+  settings: Setting[];
+}
+
+export interface SettingResponse {
+  setting: Setting;
+  message?: string;
+}
+
+export interface AppSettingsResponse {
+  settings: AppSettings;
 }
 
 /**
@@ -384,99 +398,137 @@ export const api = {
   },
   
   // Transaction endpoints
-// Update the transactions section in lib/api.ts
-transactions: {
-  getAll: (): Promise<ApiResponse<TransactionsResponse>> => {
-    return request<TransactionsResponse>('/admin/transactions');
-  },
-  getByUserId: (userId: number, limit: number = 10, offset: number = 0): Promise<ApiResponse<TransactionsResponse>> => {
-    return request<TransactionsResponse>(`/admin/users/${userId}/transactions?limit=${limit}&offset=${offset}`);
-  },
-  getRecentTransactions: (limit: number = 5): Promise<ApiResponse<TransactionsResponse>> => {
-    return request<TransactionsResponse>(`/admin/transactions/recent?limit=${limit}`);
-  }
-},
-  
-notifications: {
-  getAll: (options?: { 
-    user_id?: number; 
-    type?: string; 
-    is_read?: boolean;
-    limit?: number;
-    offset?: number;
-  }): Promise<ApiResponse<{ notifications: Notification[]; total: number }>> => {
-    // Build query string
-    const queryParams = new URLSearchParams();
-    if (options?.user_id) queryParams.append('user_id', options.user_id.toString());
-    if (options?.type) queryParams.append('type', options.type);
-    if (options?.is_read !== undefined) queryParams.append('is_read', options.is_read.toString());
-    if (options?.limit) queryParams.append('limit', options.limit.toString());
-    if (options?.offset) queryParams.append('offset', options.offset.toString());
-    
-    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
-    
-    return request<{ notifications: Notification[]; total: number }>(`/admin/notifications${queryString}`);
-  },
-  
-  getStats: (): Promise<ApiResponse<NotificationStats>> => {
-    return request<NotificationStats>('/admin/notifications/stats');
-  },
-  
-  send: (data: { user_id?: number; title: string; message: string }): Promise<ApiResponse<MessageResponse>> => {
-    return request<MessageResponse>('/admin/notifications', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  },
-  
-  markAsRead: (id: number): Promise<ApiResponse<MessageResponse>> => {
-    return request<MessageResponse>(`/admin/notifications/${id}/read`, {
-      method: 'PUT',
-    });
-  },
-  
-  delete: (id: number): Promise<ApiResponse<MessageResponse>> => {
-    return request<MessageResponse>(`/admin/notifications/${id}`, {
-      method: 'DELETE',
-    });
-  },
-},
-
-userNotifications: {
-  getAll: (limit = 10, offset = 0): Promise<ApiResponse<{ notifications: Notification[]; unread_count: number }>> => {
-    return request<{ notifications: Notification[]; unread_count: number }>(`/notifications?limit=${limit}&offset=${offset}`);
-  },
-  
-  getUnreadCount: (): Promise<ApiResponse<{ unread_count: number }>> => {
-    // Make sure the token is included in the request headers
-    const token = getToken();
-    if (!token) {
-      return Promise.resolve({ error: 'No authentication token' });
+  transactions: {
+    getAll: (): Promise<ApiResponse<TransactionsResponse>> => {
+      return request<TransactionsResponse>('/admin/transactions');
+    },
+    getByUserId: (userId: number, limit: number = 10, offset: number = 0): Promise<ApiResponse<TransactionsResponse>> => {
+      return request<TransactionsResponse>(`/admin/users/${userId}/transactions?limit=${limit}&offset=${offset}`);
+    },
+    getRecentTransactions: (limit: number = 5): Promise<ApiResponse<TransactionsResponse>> => {
+      return request<TransactionsResponse>(`/admin/transactions/recent?limit=${limit}`);
     }
-    
-    // Check for non-standard device ID requirement
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${token}`,
-      // If your API requires a device ID, add it here
-      'X-Device-ID': 'web-admin-dashboard' // Use a consistent value for the admin dashboard
-    };
-    
-    return request<{ unread_count: number }>('/notifications/unread-count', {
-      headers
-    });
   },
   
-  markAsRead: (id: number): Promise<ApiResponse<MessageResponse>> => {
-    return request<MessageResponse>(`/notifications/${id}/read`, {
-      method: 'PUT',
-    });
+  // Notification endpoints
+  notifications: {
+    getAll: (options?: { 
+      user_id?: number; 
+      type?: string; 
+      is_read?: boolean;
+      limit?: number;
+      offset?: number;
+    }): Promise<ApiResponse<{ notifications: Notification[]; total: number }>> => {
+      // Build query string
+      const queryParams = new URLSearchParams();
+      if (options?.user_id) queryParams.append('user_id', options.user_id.toString());
+      if (options?.type) queryParams.append('type', options.type);
+      if (options?.is_read !== undefined) queryParams.append('is_read', options.is_read.toString());
+      if (options?.limit) queryParams.append('limit', options.limit.toString());
+      if (options?.offset) queryParams.append('offset', options.offset.toString());
+      
+      const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
+      
+      return request<{ notifications: Notification[]; total: number }>(`/admin/notifications${queryString}`);
+    },
+    
+    getStats: (): Promise<ApiResponse<NotificationStats>> => {
+      return request<NotificationStats>('/admin/notifications/stats');
+    },
+    
+    send: (data: { user_id?: number; title: string; message: string }): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>('/admin/notifications', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      });
+    },
+    
+    markAsRead: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/notifications/${id}/read`, {
+        method: 'PUT',
+      });
+    },
+    
+    delete: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/notifications/${id}`, {
+        method: 'DELETE',
+      });
+    },
   },
-  
-  markAllAsRead: (): Promise<ApiResponse<MessageResponse>> => {
-    return request<MessageResponse>('/notifications/mark-all-read', {
-      method: 'PUT',
-    });
-  },
-},
 
+  userNotifications: {
+    getAll: (limit = 10, offset = 0): Promise<ApiResponse<{ notifications: Notification[]; unread_count: number }>> => {
+      return request<{ notifications: Notification[]; unread_count: number }>(`/notifications?limit=${limit}&offset=${offset}`);
+    },
+    
+    getUnreadCount: (): Promise<ApiResponse<{ unread_count: number }>> => {
+      // Make sure the token is included in the request headers
+      const token = getToken();
+      if (!token) {
+        return Promise.resolve({ error: 'No authentication token' });
+      }
+      
+      // Check for non-standard device ID requirement
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${token}`,
+        // If your API requires a device ID, add it here
+        'X-Device-ID': 'web-admin-dashboard' // Use a consistent value for the admin dashboard
+      };
+      
+      return request<{ unread_count: number }>('/notifications/unread-count', {
+        headers
+      });
+    },
+    
+    markAsRead: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/notifications/${id}/read`, {
+        method: 'PUT',
+      });
+    },
+    
+    markAllAsRead: (): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>('/notifications/mark-all-read', {
+        method: 'PUT',
+      });
+    },
+  },
+
+  // Settings endpoints
+  settings: {
+    getAll: (endpoint?: string): Promise<ApiResponse<SettingsResponse>> => {
+      return request<SettingsResponse>(endpoint || '/admin/settings');
+    },
+    getById: (id: number): Promise<ApiResponse<SettingResponse>> => {
+      return request<SettingResponse>(`/admin/settings/${id}`);
+    },
+    getByKey: (key: string): Promise<ApiResponse<SettingResponse>> => {
+      return request<SettingResponse>(`/admin/settings/key/${key}`);
+    },
+    create: (settingData: Partial<Setting>): Promise<ApiResponse<SettingResponse>> => {
+      return request<SettingResponse>('/admin/settings', {
+        method: 'POST',
+        body: JSON.stringify(settingData)
+      });
+    },
+    update: (id: number, settingData: Partial<Setting>): Promise<ApiResponse<SettingResponse>> => {
+      return request<SettingResponse>(`/admin/settings/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(settingData)
+      });
+    },
+    updateValue: (key: string, value: string): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/settings/key/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify({ value })
+      });
+    },
+    delete: (id: number): Promise<ApiResponse<MessageResponse>> => {
+      return request<MessageResponse>(`/admin/settings/${id}`, {
+        method: 'DELETE'
+      });
+    },
+    getAppSettings: (): Promise<ApiResponse<AppSettingsResponse>> => {
+      return request<AppSettingsResponse>('/admin/app-settings');
+    },
+  },
 };

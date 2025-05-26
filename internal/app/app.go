@@ -63,25 +63,29 @@ func (a *App) SetupRoutes() *gin.Engine {
 	deviceRepo := repository.NewDeviceRepository(a.mongoConn)
 	notificationRepo := repository.NewNotificationRepository(a.mongoConn)
 	transactionController := controller.NewTransactionController(transactionRepo)
+	settingRepo := repository.NewSettingRepository(a.mongoConn)
+
+	settingService := service.NewSettingService(settingRepo)
+	maintenanceMiddleware := middleware.NewMaintenanceMiddleware(settingService)
+	settingController := controller.NewSettingController(settingService)
 	// Initialize services
 	deviceService := service.NewDeviceService(deviceRepo)
 	emailService := utils.NewEmailService(a.config.Email)
 	authService := service.NewAuthService(userRepo, a.jwtService.GetJWTManager(), emailService)
 	userService := service.NewUserService(userRepo, deviceRepo)
 	planService := service.NewPlanService(planRepo)
-	paymentService := service.NewPaymentService(paymentRepo, transactionRepo, userRepo, a.config.Payment)
+	paymentService := service.NewPaymentService(
+		paymentRepo,
+		transactionRepo,
+		userRepo,
+		settingService,
+		a.config.Payment,
+	)
 	bonusService := service.NewBonusService(
 		userRepo,
 		transactionRepo,
-		struct {
-			DailyBonusPercentage     float64
-			ReferralBonusAmount      float64
-			ReferralProfitPercentage float64
-		}{
-			DailyBonusPercentage:     a.config.App.DailyBonusPercentage,
-			ReferralBonusAmount:      a.config.App.ReferralBonusAmount,
-			ReferralProfitPercentage: a.config.App.ReferralProfitPercentage,
-		},
+		notificationRepo,
+		settingService,
 	)
 	taskService := service.NewTaskService(taskRepo, a.mongoConn)
 	withdrawalService := service.NewWithdrawalService(
@@ -90,11 +94,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 		userRepo,
 		taskService,
 		a.mongoConn,
-		struct {
-			MinimumWithdrawalAmount float64
-		}{
-			MinimumWithdrawalAmount: a.config.App.MinimumWithdrawalAmount,
-		},
+		settingService, // Pass settings service
 	)
 
 	kycService := service.NewKYCService(kycRepo, userRepo)
@@ -260,14 +260,20 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.GET("/transactions/recent", transactionController.GetRecentTransactions)
 		adminAPI.GET("/users/:id/transactions", transactionController.GetUserTransactions)
 		// Admin payments management
-		adminAPI.GET("/payments", paymentController.GetAllPayments)
-		adminAPI.GET("/payments/stats", paymentController.GetPaymentStats)
-		adminAPI.GET("/payments/:id", paymentController.GetPaymentByID)
-		adminAPI.GET("/payments/pending", paymentController.GetPendingManualPayments)
-		adminAPI.PUT("/payments/:id/approve", paymentController.ApproveManualPayment)
-		adminAPI.PUT("/payments/:id/reject", paymentController.RejectManualPayment)
+		adminAPI.GET("/settings/key/:key", settingController.GetSettingByKey)
+		adminAPI.PUT("/settings/key/:key", settingController.UpdateSettingValue)
+
+		// Then the ID-based routes
+		adminAPI.GET("/settings/:id", settingController.GetSettingByID)
+		adminAPI.PUT("/settings/:id", settingController.UpdateSetting)
+		adminAPI.DELETE("/settings/:id", settingController.DeleteSetting)
+
+		// Finally the collection routes
+		adminAPI.GET("/settings", settingController.GetAllSettings)
+		adminAPI.POST("/settings", settingController.CreateSetting)
 
 	}
-
+	api.GET("/app-settings", settingController.GetAppSettings)
+	api.Use(maintenanceMiddleware.CheckMaintenance())
 	return r
 }

@@ -12,26 +12,20 @@ type BonusService struct {
 	userRepo         *repository.UserRepository
 	transactionRepo  *repository.TransactionRepository
 	notificationRepo *repository.NotificationRepository
-	config           struct {
-		DailyBonusPercentage     float64
-		ReferralBonusAmount      float64
-		ReferralProfitPercentage float64
-	}
+	settingService   *SettingService // Add this field
 }
 
 func NewBonusService(
 	userRepo *repository.UserRepository,
 	transactionRepo *repository.TransactionRepository,
-	config struct {
-		DailyBonusPercentage     float64
-		ReferralBonusAmount      float64
-		ReferralProfitPercentage float64
-	},
+	notificationRepo *repository.NotificationRepository,
+	settingService *SettingService, // Add this parameter
 ) *BonusService {
 	return &BonusService{
-		userRepo:        userRepo,
-		transactionRepo: transactionRepo,
-		config:          config,
+		userRepo:         userRepo,
+		transactionRepo:  transactionRepo,
+		notificationRepo: notificationRepo,
+		settingService:   settingService, // Assign the field
 	}
 }
 
@@ -51,8 +45,14 @@ func (s *BonusService) CalculateDailyBonus(userID int64) error {
 		return nil
 	}
 
-	// Calculate bonus amount (5% of total balance)
-	bonusAmount := user.Balance * (s.config.DailyBonusPercentage / 100)
+	// Get bonus percentage from settings
+	dailyBonusPercentage, err := s.settingService.GetSettingValueFloat("daily_bonus_percentage")
+	if err != nil {
+		dailyBonusPercentage = 5.0 // Default to 5% if setting not found
+	}
+
+	// Calculate bonus amount (percentage of total balance)
+	bonusAmount := user.Balance * (dailyBonusPercentage / 100)
 	if bonusAmount <= 0 {
 		// No bonus if balance is zero or negative
 		return nil
@@ -64,7 +64,7 @@ func (s *BonusService) CalculateDailyBonus(userID int64) error {
 		Amount:      bonusAmount,
 		Type:        model.TransactionTypeBonus,
 		Status:      model.TransactionStatusCompleted,
-		Description: fmt.Sprintf("%.2f%% daily bonus", s.config.DailyBonusPercentage),
+		Description: fmt.Sprintf("%.2f%% daily bonus", dailyBonusPercentage),
 	}
 
 	_, err = s.transactionRepo.Create(transaction)
@@ -154,10 +154,16 @@ func (s *BonusService) ProcessReferralBonus(userID, referrerID int64) error {
 		return fmt.Errorf("referrer not found")
 	}
 
+	// Get referral bonus amount from settings
+	referralBonusAmount, err := s.settingService.GetSettingValueFloat("referral_bonus_amount")
+	if err != nil {
+		referralBonusAmount = 100.0 // Default to 100 BDT if setting not found
+	}
+
 	// Create transaction for user
 	userTransaction := &model.Transaction{
 		UserID:      userID,
-		Amount:      s.config.ReferralBonusAmount,
+		Amount:      referralBonusAmount,
 		Type:        model.TransactionTypeReferralBonus,
 		Status:      model.TransactionStatusCompleted,
 		Description: fmt.Sprintf("Referral bonus for being referred by %s", referrer.Name),
@@ -171,7 +177,7 @@ func (s *BonusService) ProcessReferralBonus(userID, referrerID int64) error {
 	// Create transaction for referrer
 	referrerTransaction := &model.Transaction{
 		UserID:      referrerID,
-		Amount:      s.config.ReferralBonusAmount,
+		Amount:      referralBonusAmount,
 		Type:        model.TransactionTypeReferralBonus,
 		Status:      model.TransactionStatusCompleted,
 		Description: fmt.Sprintf("Referral bonus for referring %s", user.Name),
@@ -183,13 +189,13 @@ func (s *BonusService) ProcessReferralBonus(userID, referrerID int64) error {
 	}
 
 	// Update user balance
-	err = s.userRepo.UpdateBalance(userID, s.config.ReferralBonusAmount)
+	err = s.userRepo.UpdateBalance(userID, referralBonusAmount)
 	if err != nil {
 		return err
 	}
 
 	// Update referrer balance
-	err = s.userRepo.UpdateBalance(referrerID, s.config.ReferralBonusAmount)
+	err = s.userRepo.UpdateBalance(referrerID, referralBonusAmount)
 	if err != nil {
 		return err
 	}
@@ -200,7 +206,7 @@ func (s *BonusService) ProcessReferralBonus(userID, referrerID int64) error {
 		userNotification := &model.Notification{
 			UserID:  userID,
 			Title:   "Referral Bonus Received",
-			Message: fmt.Sprintf("You have received a referral bonus of %.2f BDT for being referred by %s.", s.config.ReferralBonusAmount, referrer.Name),
+			Message: fmt.Sprintf("You have received a referral bonus of %.2f BDT for being referred by %s.", referralBonusAmount, referrer.Name),
 			Type:    model.NotificationTypeBonus,
 			IsRead:  false,
 		}
@@ -214,7 +220,7 @@ func (s *BonusService) ProcessReferralBonus(userID, referrerID int64) error {
 		referrerNotification := &model.Notification{
 			UserID:  referrerID,
 			Title:   "Referral Bonus Received",
-			Message: fmt.Sprintf("You have received a referral bonus of %.2f BDT for referring %s.", s.config.ReferralBonusAmount, user.Name),
+			Message: fmt.Sprintf("You have received a referral bonus of %.2f BDT for referring %s.", referralBonusAmount, user.Name),
 			Type:    model.NotificationTypeBonus,
 			IsRead:  false,
 		}
@@ -229,7 +235,6 @@ func (s *BonusService) ProcessReferralBonus(userID, referrerID int64) error {
 }
 
 // ProcessReferralProfitBonus processes the referral profit bonus
-// This should be called when a user receives a profit (e.g., daily bonus)
 func (s *BonusService) ProcessReferralProfitBonus(userID, referrerID int64, profitAmount float64) error {
 	// Get user
 	user, err := s.userRepo.FindByID(userID)
@@ -254,8 +259,14 @@ func (s *BonusService) ProcessReferralProfitBonus(userID, referrerID int64, prof
 		return nil
 	}
 
-	// Calculate bonus amount (10% of profit)
-	bonusAmount := profitAmount * (s.config.ReferralProfitPercentage / 100)
+	// Get referral profit percentage from settings
+	referralProfitPercentage, err := s.settingService.GetSettingValueFloat("referral_profit_percentage")
+	if err != nil {
+		referralProfitPercentage = 10.0 // Default to 10% if setting not found
+	}
+
+	// Calculate bonus amount (percentage of profit)
+	bonusAmount := profitAmount * (referralProfitPercentage / 100)
 	if bonusAmount <= 0 {
 		// No bonus if profit is zero or negative
 		return nil
@@ -267,7 +278,7 @@ func (s *BonusService) ProcessReferralProfitBonus(userID, referrerID int64, prof
 		Amount:      bonusAmount,
 		Type:        model.TransactionTypeReferralProfit,
 		Status:      model.TransactionStatusCompleted,
-		Description: fmt.Sprintf("%.2f%% profit bonus from %s", s.config.ReferralProfitPercentage, user.Name),
+		Description: fmt.Sprintf("%.2f%% profit bonus from %s", referralProfitPercentage, user.Name),
 	}
 
 	_, err = s.transactionRepo.Create(transaction)

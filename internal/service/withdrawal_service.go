@@ -15,10 +15,8 @@ type WithdrawalService struct {
 	transactionRepo *repository.TransactionRepository
 	userRepo        *repository.UserRepository
 	taskService     *TaskService
-	mongoConn       *database.MongoDBConnection // Add this field
-	config          struct {
-		MinimumWithdrawalAmount float64
-	}
+	mongoConn       *database.MongoDBConnection
+	settingService  *SettingService // Add this field
 }
 
 func NewWithdrawalService(
@@ -26,10 +24,8 @@ func NewWithdrawalService(
 	transactionRepo *repository.TransactionRepository,
 	userRepo *repository.UserRepository,
 	taskService *TaskService,
-	mongoConn *database.MongoDBConnection, // Add this parameter
-	config struct {
-		MinimumWithdrawalAmount float64
-	},
+	mongoConn *database.MongoDBConnection,
+	settingService *SettingService, // Add this parameter
 ) *WithdrawalService {
 	return &WithdrawalService{
 		withdrawalRepo:  withdrawalRepo,
@@ -37,7 +33,7 @@ func NewWithdrawalService(
 		userRepo:        userRepo,
 		taskService:     taskService,
 		mongoConn:       mongoConn,
-		config:          config,
+		settingService:  settingService, // Assign the field
 	}
 }
 
@@ -48,9 +44,20 @@ func (s *WithdrawalService) RequestWithdrawal(
 	paymentMethod string,
 	paymentDetails model.PaymentDetails,
 ) (*model.Withdrawal, error) {
+	minWithdrawalAmount, err := s.settingService.GetSettingValueFloat("minimum_withdrawal_amount")
+	if err != nil {
+		minWithdrawalAmount = 100.0 // Default to 100 BDT if setting not found
+	}
+
+	// Check if withdrawals are enabled
+	withdrawalsEnabled, err := s.settingService.GetSettingValueBool("enable_withdrawals")
+	if err == nil && !withdrawalsEnabled {
+		return nil, errors.New("withdrawals are currently disabled")
+	}
+
 	// Validate amount
-	if amount < s.config.MinimumWithdrawalAmount {
-		return nil, fmt.Errorf("withdrawal amount must be at least %.2f BDT", s.config.MinimumWithdrawalAmount)
+	if amount < minWithdrawalAmount {
+		return nil, fmt.Errorf("withdrawal amount must be at least %.2f BDT", minWithdrawalAmount)
 	}
 
 	// Get user

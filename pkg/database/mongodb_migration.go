@@ -38,7 +38,8 @@ func RunMongoDBMigrations(conn *MongoDBConnection) error {
 		"support_messages",
 		"news",
 		"faqs",
-		"counters", // For auto-incrementing IDs
+		"counters",
+		"settings",
 	}
 
 	for _, collName := range collections {
@@ -86,7 +87,196 @@ func createCollection(ctx context.Context, db *mongo.Database, name string) erro
 
 // seedInitialData seeds initial data if collections are empty
 func seedInitialData(ctx context.Context, db *mongo.Database) error {
-	// Seed plans if empty
+	settingCount, err := db.Collection("settings").CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return err
+	}
+	if settingCount == 0 {
+		// Create default settings
+		settings := []interface{}{
+			// App settings
+			&model.Setting{
+				ID:          1,
+				Key:         "daily_bonus_percentage",
+				Value:       "5.0",
+				Type:        model.SettingTypeNumber,
+				DisplayName: "Daily Bonus Percentage",
+				Description: "Percentage of daily bonus applied to user balance",
+				Group:       "bonus",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          2,
+				Key:         "referral_bonus_amount",
+				Value:       "100.0",
+				Type:        model.SettingTypeNumber,
+				DisplayName: "Referral Bonus Amount",
+				Description: "Amount for referral bonus in BDT",
+				Group:       "bonus",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          3,
+				Key:         "referral_profit_percentage",
+				Value:       "10.0",
+				Type:        model.SettingTypeNumber,
+				DisplayName: "Referral Profit Percentage",
+				Description: "Percentage of profit shared with referrer",
+				Group:       "bonus",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          4,
+				Key:         "minimum_withdrawal_amount",
+				Value:       "100.0",
+				Type:        model.SettingTypeNumber,
+				DisplayName: "Minimum Withdrawal Amount",
+				Description: "Minimum amount that can be withdrawn in BDT",
+				Group:       "withdrawal",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          5,
+				Key:         "usd_to_bdt_rate",
+				Value:       "120.0",
+				Type:        model.SettingTypeNumber,
+				DisplayName: "USD to BDT Conversion Rate",
+				Description: "Conversion rate from USD to BDT",
+				Group:       "payment",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          6,
+				Key:         "site_name",
+				Value:       "Investment App",
+				Type:        model.SettingTypeString,
+				DisplayName: "Site Name",
+				Description: "Name of the website or application",
+				Group:       "general",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          7,
+				Key:         "site_logo_url",
+				Value:       "/assets/logo.png",
+				Type:        model.SettingTypeString,
+				DisplayName: "Site Logo URL",
+				Description: "URL to the site logo image",
+				Group:       "general",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          8,
+				Key:         "maintenance_mode",
+				Value:       "false",
+				Type:        model.SettingTypeBoolean,
+				DisplayName: "Maintenance Mode",
+				Description: "Enable maintenance mode to temporarily disable the site",
+				Group:       "system",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          9,
+				Key:         "enable_withdrawals",
+				Value:       "true",
+				Type:        model.SettingTypeBoolean,
+				DisplayName: "Enable Withdrawals",
+				Description: "Allow users to request withdrawals",
+				Group:       "withdrawal",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          10,
+				Key:         "enable_deposits",
+				Value:       "true",
+				Type:        model.SettingTypeBoolean,
+				DisplayName: "Enable Deposits",
+				Description: "Allow users to make deposits",
+				Group:       "payment",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          11,
+				Key:         "profit_calculation_time",
+				Value:       "00:01",
+				Type:        model.SettingTypeString,
+				DisplayName: "Profit Calculation Time",
+				Description: "Time of day when daily profit is calculated (HH:MM)",
+				Group:       "bonus",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          12,
+				Key:         "contact_email",
+				Value:       "support@investmentapp.com",
+				Type:        model.SettingTypeString,
+				DisplayName: "Contact Email",
+				Description: "Email address for user support",
+				Group:       "contact",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          13,
+				Key:         "contact_phone",
+				Value:       "+1234567890",
+				Type:        model.SettingTypeString,
+				DisplayName: "Contact Phone",
+				Description: "Phone number for user support",
+				Group:       "contact",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          14,
+				Key:         "facebook_url",
+				Value:       "https://facebook.com/investmentapp",
+				Type:        model.SettingTypeString,
+				DisplayName: "Facebook URL",
+				Description: "URL to the Facebook page",
+				Group:       "social",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+			&model.Setting{
+				ID:          15,
+				Key:         "twitter_url",
+				Value:       "https://twitter.com/investmentapp",
+				Type:        model.SettingTypeString,
+				DisplayName: "Twitter URL",
+				Description: "URL to the Twitter profile",
+				Group:       "social",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
+		}
+
+		_, err = db.Collection("settings").InsertMany(ctx, settings)
+		if err != nil {
+			return err
+		}
+		log.Println("Seeded settings")
+
+		// Set up counter for settings
+		_, err = db.Collection("counters").InsertOne(ctx, bson.M{
+			"_id": "setting_id",
+			"seq": int64(15), // Starting after the last inserted setting
+		})
+		if err != nil {
+			return err
+		}
+	}
 	planCount, err := db.Collection("plans").CountDocuments(ctx, bson.M{})
 	if err != nil {
 		return err
