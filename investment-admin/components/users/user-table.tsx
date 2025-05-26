@@ -55,7 +55,6 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
     setSelectedUserId(userId);
     setShowUserDetailsDialog(true);
   };
-
   const handleBlockUser = async () => {
     if (!actionUser) return;
 
@@ -67,8 +66,19 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
         throw new Error(response.error);
       }
 
+      // Log success
+      console.log("User blocked successfully:", actionUser.id);
+
       setShowBlockDialog(false);
-      onRefresh();
+
+      // Make sure onRefresh is awaited
+      await onRefresh();
+
+      // Force a state update to reflect the change immediately
+      // This is a workaround if the API refresh isn't working
+      if (actionUser) {
+        const updatedUser = { ...actionUser, is_blocked: true };
+      }
     } catch (err) {
       console.error("Error blocking user:", err);
       setError(err instanceof Error ? err.message : "Failed to block user");
@@ -77,6 +87,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
     }
   };
 
+  // Similarly update handleUnblockUser
   const handleUnblockUser = async () => {
     if (!actionUser) return;
 
@@ -89,7 +100,13 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
       }
 
       setShowUnblockDialog(false);
-      onRefresh();
+
+      // Call onRefresh and wait for it to complete
+      await onRefresh();
+
+      // Force state update by closing any open dialogs
+      setSelectedUserId(null);
+      setActionUser(null);
     } catch (err) {
       console.error("Error unblocking user:", err);
       setError(err instanceof Error ? err.message : "Failed to unblock user");

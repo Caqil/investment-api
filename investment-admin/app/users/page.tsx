@@ -90,6 +90,7 @@ function UserStats({ stats, loading }: { stats: any; loading: boolean }) {
 
 export default function UsersPage() {
   const router = useRouter();
+
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,6 +113,7 @@ export default function UsersPage() {
     plan_distribution: [],
   });
 
+  // In investment-admin/app/users/page.tsx
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
@@ -124,6 +126,16 @@ export default function UsersPage() {
       }
 
       const fetchedUsers = response.data?.users || [];
+
+      // Log to debug what properties are in the user objects
+      console.log("Fetched users:", fetchedUsers);
+
+      // Check if is_blocked exists in the user objects
+      if (fetchedUsers.length > 0) {
+        console.log("First user properties:", Object.keys(fetchedUsers[0]));
+        console.log("is_blocked value:", fetchedUsers[0].is_blocked);
+      }
+
       setUsers(fetchedUsers);
 
       // Fetch user statistics
@@ -148,25 +160,59 @@ export default function UsersPage() {
     fetchUsers();
   }, [refreshTrigger]);
 
-  // Apply filters whenever dependencies change
   useEffect(() => {
+    if (users.length === 0) {
+      setFilteredUsers([]);
+      return;
+    }
+
     let result = [...users];
+    console.log("Applying filter:", activeTab);
 
     // Apply status filter based on active tab
     if (activeTab === "active") {
       result = result.filter((user) => !user.is_blocked);
+      console.log("Active users count:", result.length);
     } else if (activeTab === "blocked") {
-      result = result.filter((user) => user.is_blocked);
+      result = result.filter((user) => user.is_blocked === true);
+      console.log("Blocked users count:", result.length);
+
+      // Log the blocked users for debugging
+      if (result.length > 0) {
+        console.log("Sample blocked user:", result[0]);
+      } else {
+        console.log("No blocked users found");
+
+        // Check if any users have is_blocked set to true
+        const blockedUsersCheck = users.filter(
+          (user) => user.is_blocked === true
+        );
+        console.log(
+          "Manual check for blocked users:",
+          blockedUsersCheck.length
+        );
+
+        // Log all users to check their is_blocked property
+        console.log(
+          "All users is_blocked check:",
+          users.map((u) => ({
+            id: u.id,
+            name: u.name,
+            is_blocked: u.is_blocked,
+          }))
+        );
+      }
     } else if (activeTab === "admin") {
-      result = result.filter((user) => user.is_admin);
+      result = result.filter((user) => user.is_admin === true);
+      console.log("Admin users count:", result.length);
     }
 
-    // Apply plan filter
-    if (planFilter !== "all") {
-      result = result.filter((user) => {
-        const userPlan = plans.find((plan) => plan.name === planFilter);
-        return userPlan && user.plan_id === userPlan.value;
-      });
+    if (activeTab === "active") {
+      result = result.filter((user) => !user.is_blocked);
+    } else if (activeTab === "blocked") {
+      result = result.filter((user) => user.is_blocked === true);
+    } else if (activeTab === "admin") {
+      result = result.filter((user) => user.is_admin === true);
     }
 
     // Apply search query
@@ -174,26 +220,47 @@ export default function UsersPage() {
       const query = searchQuery.toLowerCase();
       result = result.filter(
         (user) =>
-          user.name.toLowerCase().includes(query) ||
-          user.email.toLowerCase().includes(query) ||
-          user.phone?.toLowerCase().includes(query) ||
-          user.id.toString().includes(query) ||
-          user.referral_code?.toLowerCase().includes(query)
+          (user.name && user.name.toLowerCase().includes(query)) ||
+          (user.email && user.email.toLowerCase().includes(query)) ||
+          (user.phone && user.phone.toLowerCase().includes(query)) ||
+          (user.id && user.id.toString().includes(query)) ||
+          (user.referral_code &&
+            user.referral_code.toLowerCase().includes(query))
       );
     }
 
+    // Apply plan filter - calculate plans inside this effect
+    if (
+      planFilter !== "all" &&
+      stats.plan_distribution &&
+      stats.plan_distribution.length > 0
+    ) {
+      const selectedPlan = stats.plan_distribution.find(
+        (plan) => plan.name === planFilter
+      );
+      if (selectedPlan) {
+        result = result.filter((user) => user.plan_id === selectedPlan.value);
+      }
+    }
+
+    // Update filtered users state
     setFilteredUsers(result);
-  }, [users, activeTab, planFilter, searchQuery]);
+  }, [users, activeTab, planFilter, searchQuery, stats.plan_distribution]);
+
+  // Make handleRefresh async
+  const handleRefresh = async () => {
+    try {
+      await fetchUsers();
+      toast.success("User list refreshed");
+    } catch (error) {
+      toast.error("Failed to refresh user list");
+    }
+  };
 
   const handleUserCreated = (newUser: User) => {
     // Refresh the user list
     setRefreshTrigger((prev) => prev + 1);
     toast.success(`User ${newUser.name} created successfully`);
-  };
-
-  const handleRefresh = () => {
-    setRefreshTrigger((prev) => prev + 1);
-    toast.success("User list refreshed");
   };
 
   // Get unique plans for filter

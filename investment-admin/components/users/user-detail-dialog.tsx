@@ -102,6 +102,14 @@ export function UserDetailsDialog({
     }
   }, [open, userId]);
 
+  // Force refresh when tab changes
+  useEffect(() => {
+    if (open && userId && activeTab === "overview") {
+      // Refresh when returning to overview tab
+      fetchUserDetails(userId);
+    }
+  }, [activeTab]);
+
   const fetchUserDetails = async (id: number) => {
     setLoading(true);
     setError(null);
@@ -191,7 +199,6 @@ export function UserDetailsDialog({
       setActionLoading(false);
     }
   };
-
   const handleBlockUser = async () => {
     if (!user) return;
 
@@ -208,10 +215,18 @@ export function UserDetailsDialog({
       // Refresh user details
       await fetchUserDetails(user.id);
 
-      // Call onAction to refresh the user list
+      // Call onAction to refresh the parent component
       if (onAction) {
-        onAction();
+        await onAction();
       }
+
+      // Force UI update by updating the user state directly
+      setUser((prev) => {
+        if (prev) {
+          return { ...prev, is_blocked: true };
+        }
+        return prev;
+      });
     } catch (err) {
       console.error("Error blocking user:", err);
       setError(err instanceof Error ? err.message : "Failed to block user");
@@ -236,10 +251,18 @@ export function UserDetailsDialog({
       // Refresh user details
       await fetchUserDetails(user.id);
 
-      // Call onAction to refresh the user list
+      // Call onAction to refresh the parent component
       if (onAction) {
-        onAction();
+        await onAction();
       }
+
+      // Force UI update by updating the user state directly
+      setUser((prev) => {
+        if (prev) {
+          return { ...prev, is_blocked: false };
+        }
+        return prev;
+      });
     } catch (err) {
       console.error("Error unblocking user:", err);
       setError(err instanceof Error ? err.message : "Failed to unblock user");

@@ -53,6 +53,7 @@ type Payment struct {
 	ID               int64              `json:"id" bson:"id"`
 	ObjectID         primitive.ObjectID `json:"-" bson:"_id,omitempty"`
 	TransactionID    int64              `json:"transaction_id" bson:"transaction_id"`
+	UserID           int64              `json:"user_id" bson:"user_id"`
 	Gateway          PaymentGateway     `json:"gateway" bson:"gateway"`
 	GatewayReference string             `json:"gateway_reference,omitempty" bson:"gateway_reference,omitempty"`
 	Currency         Currency           `json:"currency" bson:"currency"`
@@ -65,6 +66,7 @@ type Payment struct {
 
 type PaymentResponse struct {
 	ID               int64          `json:"id"`
+	UserID           int64          `json:"user_id"`
 	Gateway          PaymentGateway `json:"gateway"`
 	GatewayReference string         `json:"gateway_reference,omitempty"`
 	Currency         Currency       `json:"currency"`
@@ -76,6 +78,7 @@ type PaymentResponse struct {
 func (p *Payment) ToResponse() *PaymentResponse {
 	return &PaymentResponse{
 		ID:               p.ID,
+		UserID:           p.UserID,
 		Gateway:          p.Gateway,
 		GatewayReference: p.GatewayReference,
 		Currency:         p.Currency,

@@ -1,48 +1,27 @@
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+"use client";
+
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Payment,
+  PaymentStatus,
+  PaymentGateway,
+  Currency,
+} from "@/types/payment";
+import { formatDate, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { formatDate, formatCurrency } from "@/lib/utils";
-import { Payment, PaymentStatus, PaymentGateway } from "@/types/payment";
 import { Eye, CheckCircle, XCircle } from "lucide-react";
 
 interface PaymentsTableProps {
   payments: Payment[];
   loading: boolean;
-  onApprove: (id: number) => void;
-  onReject: (id: number, reason: string) => void;
+  onViewDetails: (id: number) => void;
 }
 
 export function PaymentsTable({
   payments,
   loading,
-  onApprove,
-  onReject,
+  onViewDetails,
 }: PaymentsTableProps) {
-  const router = useRouter();
-  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-  const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-
-  // Function to determine badge color based on status
   const getStatusBadge = (status: PaymentStatus) => {
     switch (status) {
       case PaymentStatus.PENDING:
@@ -77,171 +56,165 @@ export function PaymentsTable({
     }
   };
 
-  // Function to determine gateway label
-  const getGatewayLabel = (gateway: PaymentGateway) => {
+  const formatGatewayName = (gateway: string) => {
     switch (gateway) {
       case PaymentGateway.COINGATE:
-        return "Coingate";
+        return "CoinGate";
       case PaymentGateway.UDDOKTAPAY:
         return "UddoktaPay";
       case PaymentGateway.MANUAL:
         return "Manual";
       default:
-        return "Unknown";
-    }
-  };
-
-  const handleViewDetails = (id: number) => {
-    router.push(`/payments/${id}`);
-  };
-
-  const handleApproveClick = (payment: Payment) => {
-    onApprove(payment.id);
-  };
-
-  const handleRejectClick = (payment: Payment) => {
-    setSelectedPayment(payment);
-    setRejectionReason("");
-    setShowRejectDialog(true);
-  };
-
-  const handleConfirmReject = () => {
-    if (selectedPayment && rejectionReason.trim()) {
-      onReject(selectedPayment.id, rejectionReason);
-      setShowRejectDialog(false);
-      setSelectedPayment(null);
-      setRejectionReason("");
+        return gateway;
     }
   };
 
   if (loading) {
     return (
-      <div className="space-y-2">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <div key={index} className="flex items-center space-x-4 p-2">
-            <Skeleton className="h-12 w-12 rounded-full" />
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-[250px]" />
-              <Skeleton className="h-4 w-[200px]" />
+      <div className="border rounded-md p-6">
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="flex flex-col space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
             </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (payments.length === 0) {
+    return (
+      <div className="border rounded-md p-8 text-center">
+        <div className="flex flex-col items-center justify-center">
+          <div className="rounded-full bg-gray-100 p-3 mb-4">
+            <Eye className="h-6 w-6 text-gray-400" />
           </div>
-        ))}
+          <h3 className="text-lg font-medium">No payments found</h3>
+          <p className="text-sm text-gray-500 mt-1">
+            There are no payment transactions matching your criteria.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ID</TableHead>
-              <TableHead>Gateway</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Reference</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {payments.length === 0 ? (
-              <TableRow>
-                <TableCell
-                  colSpan={7}
-                  className="text-center py-6 text-muted-foreground"
-                >
-                  No payments found
-                </TableCell>
-              </TableRow>
-            ) : (
-              payments.map((payment) => (
-                <TableRow key={payment.id}>
-                  <TableCell>{payment.id}</TableCell>
-                  <TableCell>{getGatewayLabel(payment.gateway)}</TableCell>
-                  <TableCell>
-                    {formatCurrency(payment.amount, payment.currency)}
-                  </TableCell>
-                  <TableCell>{payment.gateway_reference || "N/A"}</TableCell>
-                  <TableCell>{getStatusBadge(payment.status)}</TableCell>
-                  <TableCell>{formatDate(payment.created_at)}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewDetails(payment.id)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
+    <div className="border rounded-md overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th
+                scope="col"
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                ID
+              </th>
+              <th
+                scope="col"
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Gateway
+              </th>
+              <th
+                scope="col"
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Amount
+              </th>
+              <th
+                scope="col"
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Reference
+              </th>
+              <th
+                scope="col"
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Status
+              </th>
+              <th
+                scope="col"
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Date
+              </th>
+              <th
+                scope="col"
+                className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                Actions
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {payments.map((payment) => (
+              <tr key={payment.id}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {payment.id}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatGatewayName(payment.gateway)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatCurrency(payment.amount, payment.currency)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {payment.gateway_reference
+                    ? payment.gateway_reference.length > 12
+                      ? `${payment.gateway_reference.substring(0, 12)}...`
+                      : payment.gateway_reference
+                    : "N/A"}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {getStatusBadge(payment.status)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatDate(payment.created_at)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onViewDetails(payment.id)}
+                    className="h-8 gap-1"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Details
+                  </Button>
 
-                      {payment.status === PaymentStatus.PENDING &&
-                        payment.gateway === PaymentGateway.MANUAL && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-green-600 hover:text-green-800 hover:bg-green-50"
-                              onClick={() => handleApproveClick(payment)}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Approve
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                              onClick={() => handleRejectClick(payment)}
-                            >
-                              <XCircle className="h-4 w-4 mr-1" />
-                              Reject
-                            </Button>
-                          </>
-                        )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
+                  {payment.status === PaymentStatus.PENDING &&
+                    payment.gateway === PaymentGateway.MANUAL && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onViewDetails(payment.id)}
+                          className="h-8 gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 ml-2"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Approve
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onViewDetails(payment.id)}
+                          className="h-8 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Reject
+                        </Button>
+                      </>
+                    )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-
-      {/* Rejection Dialog */}
-      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Reject Payment</DialogTitle>
-            <DialogDescription>
-              Please provide a reason for rejecting this payment. This will be
-              visible to the user.
-            </DialogDescription>
-          </DialogHeader>
-          <Textarea
-            placeholder="Enter reason for rejection"
-            value={rejectionReason}
-            onChange={(e) => setRejectionReason(e.target.value)}
-            className="min-h-[100px]"
-          />
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowRejectDialog(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleConfirmReject}
-              disabled={!rejectionReason.trim()}
-            >
-              Reject Payment
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
+    </div>
   );
 }

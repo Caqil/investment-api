@@ -213,6 +213,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 	adminAPI.Use(adminMiddleware.EnsureAdmin())
 	{
 		// Admin user management
+		adminAPI.GET("/users/stats", adminController.GetUserStats)
 		adminAPI.POST("/users", adminController.CreateUser)
 		adminAPI.GET("/users", adminController.GetAllUsers)
 		adminAPI.GET("/users/:id", adminController.GetUserDetails)

@@ -1,116 +1,96 @@
-// investment-admin/components/payments/payment-stats.tsx
+"use client";
+
+import { Card } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  ArrowUpRight,
-  BanknoteIcon,
-  Clock,
-  CheckCircle,
-  XCircle,
-  ArrowDownRight,
-} from "lucide-react";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Clock, CheckCircle, XCircle, DollarSign } from "lucide-react";
 
 interface PaymentStatsProps {
   stats: {
-    totalPayments: number;
-    totalPending: number;
-    totalCompleted: number;
-    totalFailed: number;
-    totalAmount: number;
-    totalManualPayments: number;
+    total_payments: number;
+    total_amount: number;
+    pending_count: number;
+    completed_count: number;
+    failed_count: number;
+    manual_count?: number; // Make optional
+    coingate_count?: number; // Make optional
+    uddoktapay_count?: number; // Make optional
   };
   loading: boolean;
 }
 
 export function PaymentStats({ stats, loading }: PaymentStatsProps) {
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-4 mb-6">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <Card key={i} className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="h-12 w-12 rounded-full bg-gray-200 animate-pulse"></div>
+              <div className="space-y-2">
+                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
-      {/* Total Payments */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Payments</CardTitle>
-          <BanknoteIcon className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-7 w-20" />
-          ) : (
-            <div className="text-2xl font-bold">{stats.totalPayments}</div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            Manual: {stats.totalManualPayments}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Total Amount */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Amount</CardTitle>
-          <ArrowUpRight className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-7 w-24" />
-          ) : (
-            <div className="text-2xl font-bold">
-              {formatCurrency(stats.totalAmount, "USD")}
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            From {stats.totalPayments} payments
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Pending Payments */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Pending</CardTitle>
-          <Clock className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-7 w-16" />
-          ) : (
-            <div className="text-2xl font-bold">{stats.totalPending}</div>
-          )}
-          <p className="text-xs text-muted-foreground">Awaiting approval</p>
-        </CardContent>
-      </Card>
-
-      {/* Success Rate */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-          <div className="flex items-center">
-            <CheckCircle className="h-4 w-4 mr-1 text-green-500" />
-            <XCircle className="h-4 w-4 text-red-500" />
+    <div className="grid gap-4 md:grid-cols-4 mb-6">
+      <Card className="p-6">
+        <div className="flex items-center space-x-4">
+          <div className="p-2 bg-indigo-100 rounded-full">
+            <DollarSign className="h-6 w-6 text-indigo-600" />
           </div>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <Skeleton className="h-7 w-16" />
-          ) : (
-            <div className="text-2xl font-bold">
-              {stats.totalPayments > 0
-                ? `${Math.round(
-                    (stats.totalCompleted / stats.totalPayments) * 100
-                  )}%`
-                : "0%"}
-            </div>
-          )}
-          <p className="text-xs text-muted-foreground">
-            {stats.totalCompleted} successful / {stats.totalFailed} failed
-          </p>
-        </CardContent>
+          <div>
+            <p className="text-sm font-medium text-gray-500">Total Amount</p>
+            <h3 className="text-2xl font-bold">
+              {formatCurrency(stats.total_amount, "BDT")}
+            </h3>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="flex items-center space-x-4">
+          <div className="p-2 bg-yellow-100 rounded-full">
+            <Clock className="h-6 w-6 text-yellow-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">
+              Pending Payments
+            </p>
+            <h3 className="text-2xl font-bold">{stats.pending_count}</h3>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="flex items-center space-x-4">
+          <div className="p-2 bg-green-100 rounded-full">
+            <CheckCircle className="h-6 w-6 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">
+              Completed Payments
+            </p>
+            <h3 className="text-2xl font-bold">{stats.completed_count}</h3>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="flex items-center space-x-4">
+          <div className="p-2 bg-red-100 rounded-full">
+            <XCircle className="h-6 w-6 text-red-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">Failed Payments</p>
+            <h3 className="text-2xl font-bold">{stats.failed_count}</h3>
+          </div>
+        </div>
       </Card>
     </div>
   );

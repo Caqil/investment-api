@@ -43,6 +43,8 @@ type UserResponse struct {
 	BiometricEnabled bool      `json:"biometric_enabled"`
 	ProfilePicURL    string    `json:"profile_pic_url"`
 	CreatedAt        time.Time `json:"created_at"`
+	IsBlocked        bool      `json:"is_blocked"` 
+	IsAdmin          bool      `json:"is_admin"`
 }
 
 func (u *User) ToResponse() *UserResponse {
@@ -57,5 +59,7 @@ func (u *User) ToResponse() *UserResponse {
 		BiometricEnabled: u.BiometricEnabled,
 		ProfilePicURL:    u.ProfilePicURL,
 		CreatedAt:        u.CreatedAt,
+		IsBlocked:        u.IsBlocked, 
+		IsAdmin:          u.IsAdmin,
 	}
 }

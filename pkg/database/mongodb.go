@@ -71,3 +71,8 @@ func (c *MongoDBConnection) Close() error {
 func (c *MongoDBConnection) GetCollection(name string) *mongo.Collection {
 	return c.Database.Collection(name)
 }
+func (m *MongoDBConnection) GetContext() context.Context {
+	// Create a timeout context if needed
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	return ctx
+}

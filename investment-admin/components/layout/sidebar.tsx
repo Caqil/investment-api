@@ -16,11 +16,13 @@ import {
   Bell,
   BarChart3,
   Shield,
+  NewspaperIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { useAuth } from "@/providers/auth-provider";
+import { News_Cycle } from "next/font/google";
 
 interface SidebarProps {
   open: boolean;
@@ -35,6 +37,7 @@ const items = [
   { name: "Withdrawals", href: "/withdrawals", icon: CreditCard },
   { name: "KYC Verification", href: "/kyc", icon: Shield },
   { name: "Tasks", href: "/tasks", icon: ListChecks },
+  { name: "News", href: "/news", icon: NewspaperIcon },
   { name: "Notifications", href: "/notifications", icon: Bell },
   { name: "Settings", href: "/settings", icon: Settings },
 ];

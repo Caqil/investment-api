@@ -15,7 +15,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -23,9 +22,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useRouter } from "next/navigation";
 import { WithdrawalsTable } from "@/components/withdrawals/withdrawals-table";
 import { WithdrawalStats } from "@/components/withdrawals/withdrawals-stats";
+import { WithdrawalDetails } from "@/components/withdrawals/withdrawal-details";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
 interface WithdrawalStats {
   pending_count: number;
   approved_count: number;
@@ -34,7 +40,6 @@ interface WithdrawalStats {
 }
 
 export default function WithdrawalsPage() {
-  const router = useRouter();
   const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [filteredWithdrawals, setFilteredWithdrawals] = useState<Withdrawal[]>(
     []
@@ -45,6 +50,10 @@ export default function WithdrawalsPage() {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState("pending");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [selectedWithdrawalId, setSelectedWithdrawalId] = useState<
+    number | null
+  >(null);
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [stats, setStats] = useState<WithdrawalStats>({
     pending_count: 0,
     approved_count: 0,
@@ -133,11 +142,18 @@ export default function WithdrawalsPage() {
   }, [withdrawals, paymentMethodFilter, searchQuery]);
 
   const handleViewWithdrawal = (id: number) => {
-    router.push(`/withdrawals/${id}`);
+    setSelectedWithdrawalId(id);
+    setIsDetailsDialogOpen(true);
   };
 
   const handleRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
+  };
+
+  const handleWithdrawalAction = () => {
+    // After a successful withdrawal action, refresh the list and close the dialog
+    setRefreshTrigger((prev) => prev + 1);
+    setIsDetailsDialogOpen(false);
   };
 
   // Get unique payment methods for filter
@@ -257,6 +273,27 @@ export default function WithdrawalsPage() {
           </CardHeader>
         </Card>
       )}
+
+      {/* Withdrawal Details Dialog */}
+      <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {selectedWithdrawalId
+                ? `Withdrawal #${selectedWithdrawalId}`
+                : "Withdrawal Details"}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedWithdrawalId && (
+            <WithdrawalDetails
+              withdrawalId={selectedWithdrawalId}
+              onBack={() => setIsDetailsDialogOpen(false)}
+              onAction={handleWithdrawalAction}
+              isDialog={true}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </DashboardShell>
   );
 }

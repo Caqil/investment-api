@@ -2,18 +2,22 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"math/rand"
 	"time"
 
 	"github.com/Caqil/investment-api/internal/model"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // RunMongoDBMigrations sets up the MongoDB collections and indexes
 func RunMongoDBMigrations(conn *MongoDBConnection) error {
+	// Seed random number generator
+	rand.Seed(time.Now().UnixNano())
+
 	// Create a context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -274,6 +278,323 @@ func seedInitialData(ctx context.Context, db *mongo.Database) error {
 		}
 	}
 
+	// Seed test users if only the admin exists
+	if userCount <= 1 {
+		// Create test users
+		testUsers := []interface{}{}
+
+		// Create 10 regular users
+		for i := 2; i <= 11; i++ {
+			hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
+
+			// Generate a random plan ID between 1 and 5
+			planID := int64(rand.Intn(5) + 1)
+
+			// Generate a random balance between 1000 and 20000
+			balance := float64(1000 + rand.Intn(19000))
+
+			// Randomly assign KYC status
+			isKYCVerified := rand.Intn(2) == 1
+
+			user := model.User{
+				ID:               int64(i),
+				Name:             fmt.Sprintf("Test User %d", i),
+				Email:            fmt.Sprintf("user%d@example.com", i),
+				PasswordHash:     string(hashedPassword),
+				Phone:            fmt.Sprintf("555%07d", i),
+				Balance:          balance,
+				ReferralCode:     fmt.Sprintf("REF%06d", i),
+				PlanID:           planID,
+				IsKYCVerified:    isKYCVerified,
+				EmailVerified:    true,
+				IsAdmin:          false,
+				IsBlocked:        i == 11, // Make the last user blocked for testing
+				BiometricEnabled: rand.Intn(2) == 1,
+				CreatedAt:        time.Now().Add(-time.Duration(rand.Intn(30)) * 24 * time.Hour), // Random creation date within 30 days
+				UpdatedAt:        time.Now(),
+			}
+
+			testUsers = append(testUsers, user)
+		}
+
+		// Insert test users
+		_, err = db.Collection("users").InsertMany(ctx, testUsers)
+		if err != nil {
+			return err
+		}
+		log.Println("Seeded test users")
+
+		// Update user counter
+		_, err = db.Collection("counters").UpdateOne(
+			ctx,
+			bson.M{"_id": "user_id"},
+			bson.M{"$set": bson.M{"seq": int64(11)}}, // Last inserted user ID
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Seed transactions, payments, and withdrawals if empty
+	txCount, err := db.Collection("transactions").CountDocuments(ctx, bson.M{})
+	if err != nil {
+		return err
+	}
+
+	if txCount == 0 {
+		// Create mock transactions
+		transactions := []interface{}{}
+		payments := []interface{}{}
+		withdrawals := []interface{}{}
+
+		txID := int64(1)
+		paymentID := int64(1)
+		withdrawalID := int64(1)
+
+		// For each user (except admin)
+		for userID := int64(2); userID <= 11; userID++ {
+			// Skip the blocked user for transactions
+			if userID == 11 {
+				continue
+			}
+
+			// Create 1-3 deposit transactions with payments
+			numDeposits := rand.Intn(3) + 1
+			for i := 0; i < numDeposits; i++ {
+				amount := float64(500 + rand.Intn(5000))
+				createdAt := time.Now().Add(-time.Duration(rand.Intn(20)) * 24 * time.Hour)
+
+				// Create transaction
+				tx := model.Transaction{
+					ID:          txID,
+					UserID:      userID,
+					Amount:      amount,
+					Type:        model.TransactionTypeDeposit,
+					Status:      model.TransactionStatusCompleted,
+					Description: fmt.Sprintf("Deposit via %s", []string{"Coingate", "UddoktaPay", "Manual"}[rand.Intn(3)]),
+					CreatedAt:   createdAt,
+					UpdatedAt:   createdAt,
+				}
+				transactions = append(transactions, tx)
+
+				// Create payment
+				gateway := []model.PaymentGateway{
+					model.PaymentGatewayCoingate,
+					model.PaymentGatewayUddoktaPay,
+					model.PaymentGatewayManual,
+				}[rand.Intn(3)]
+
+				payment := model.Payment{
+					ID:               paymentID,
+					TransactionID:    txID,
+					Gateway:          gateway,
+					GatewayReference: fmt.Sprintf("REF%08d", rand.Intn(100000000)),
+					Currency:         []model.Currency{model.CurrencyUSD, model.CurrencyBDT}[rand.Intn(2)],
+					Amount:           amount,
+					Status:           model.PaymentStatusCompleted,
+					CreatedAt:        createdAt,
+					UpdatedAt:        createdAt,
+				}
+				payments = append(payments, payment)
+
+				txID++
+				paymentID++
+			}
+
+			// Create 0-2 withdrawal transactions with withdrawals
+			numWithdrawals := rand.Intn(3)
+			for i := 0; i < numWithdrawals; i++ {
+				amount := float64(200 + rand.Intn(2000))
+				createdAt := time.Now().Add(-time.Duration(rand.Intn(15)) * 24 * time.Hour)
+
+				// Determine status - mostly completed, some pending, few rejected
+				var status model.TransactionStatus
+				var withdrawalStatus model.WithdrawalStatus
+
+				r := rand.Intn(10)
+				if r < 7 { // 70% completed
+					status = model.TransactionStatusCompleted
+					withdrawalStatus = model.WithdrawalStatusApproved
+				} else if r < 9 { // 20% pending
+					status = model.TransactionStatusPending
+					withdrawalStatus = model.WithdrawalStatusPending
+				} else { // 10% rejected
+					status = model.TransactionStatusRejected
+					withdrawalStatus = model.WithdrawalStatusRejected
+				}
+
+				// Create transaction
+				tx := model.Transaction{
+					ID:          txID,
+					UserID:      userID,
+					Amount:      amount,
+					Type:        model.TransactionTypeWithdrawal,
+					Status:      status,
+					Description: "Withdrawal via bank transfer",
+					CreatedAt:   createdAt,
+					UpdatedAt:   createdAt,
+				}
+				transactions = append(transactions, tx)
+
+				// Create payment details
+				paymentDetails := model.PaymentDetails{
+					"bank_name":      []string{"CitiBank", "HSBC", "Bank of America", "Chase"}[rand.Intn(4)],
+					"account_name":   fmt.Sprintf("Test User %d", userID),
+					"account_number": fmt.Sprintf("%010d", rand.Intn(1000000000)),
+				}
+
+				// Create withdrawal
+				withdrawal := model.Withdrawal{
+					ID:             withdrawalID,
+					TransactionID:  txID,
+					UserID:         userID,
+					Amount:         amount,
+					PaymentMethod:  "Bank Transfer",
+					PaymentDetails: paymentDetails,
+					Status:         withdrawalStatus,
+					TasksCompleted: true,
+					CreatedAt:      createdAt,
+					UpdatedAt:      createdAt,
+				}
+
+				// Add admin note for completed or rejected
+				if withdrawalStatus == model.WithdrawalStatusApproved {
+					withdrawal.AdminNote = "Approved and processed"
+				} else if withdrawalStatus == model.WithdrawalStatusRejected {
+					withdrawal.AdminNote = "Rejected due to suspicious activity"
+				}
+
+				withdrawals = append(withdrawals, withdrawal)
+
+				txID++
+				withdrawalID++
+			}
+
+			// Create 1-3 bonus transactions
+			numBonuses := rand.Intn(3) + 1
+			for i := 0; i < numBonuses; i++ {
+				amount := float64(50 + rand.Intn(200))
+				createdAt := time.Now().Add(-time.Duration(rand.Intn(25)) * 24 * time.Hour)
+
+				// Create transaction
+				tx := model.Transaction{
+					ID:          txID,
+					UserID:      userID,
+					Amount:      amount,
+					Type:        model.TransactionTypeBonus,
+					Status:      model.TransactionStatusCompleted,
+					Description: "5.00% daily bonus",
+					CreatedAt:   createdAt,
+					UpdatedAt:   createdAt,
+				}
+				transactions = append(transactions, tx)
+
+				txID++
+			}
+		}
+
+		// Add a few pending manual payments for testing approval workflow
+		for i := 0; i < 3; i++ {
+			userID := int64(rand.Intn(9) + 2) // Random user (not admin, not blocked)
+			amount := float64(500 + rand.Intn(3000))
+			createdAt := time.Now().Add(-time.Duration(rand.Intn(5)) * 24 * time.Hour)
+
+			// Create transaction
+			tx := model.Transaction{
+				ID:          txID,
+				UserID:      userID,
+				Amount:      amount,
+				Type:        model.TransactionTypeDeposit,
+				Status:      model.TransactionStatusPending, // Pending
+				Description: "Manual deposit",
+				CreatedAt:   createdAt,
+				UpdatedAt:   createdAt,
+			}
+			transactions = append(transactions, tx)
+
+			// Create payment with metadata
+			metadata := model.JSON{
+				"transaction_id": fmt.Sprintf("TRX%08d", rand.Intn(10000000)),
+				"payment_method": "Mobile Banking",
+				"sender_information": map[string]interface{}{
+					"name":  fmt.Sprintf("Test User %d", userID),
+					"phone": fmt.Sprintf("555%07d", rand.Intn(1000000)),
+				},
+			}
+
+			payment := model.Payment{
+				ID:            paymentID,
+				TransactionID: txID,
+				Gateway:       model.PaymentGatewayManual,
+				Currency:      model.CurrencyBDT,
+				Amount:        amount,
+				Status:        model.PaymentStatusPending, // Pending
+				Metadata:      metadata,
+				CreatedAt:     createdAt,
+				UpdatedAt:     createdAt,
+			}
+			payments = append(payments, payment)
+
+			txID++
+			paymentID++
+		}
+
+		// Insert all data
+		if len(transactions) > 0 {
+			_, err = db.Collection("transactions").InsertMany(ctx, transactions)
+			if err != nil {
+				return err
+			}
+			log.Printf("Seeded %d transactions", len(transactions))
+
+			// Update transaction counter
+			_, err = db.Collection("counters").UpdateOne(
+				ctx,
+				bson.M{"_id": "transaction_id"},
+				bson.M{"$set": bson.M{"seq": txID - 1}},
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		if len(payments) > 0 {
+			_, err = db.Collection("payments").InsertMany(ctx, payments)
+			if err != nil {
+				return err
+			}
+			log.Printf("Seeded %d payments", len(payments))
+
+			// Update payment counter
+			_, err = db.Collection("counters").UpdateOne(
+				ctx,
+				bson.M{"_id": "payment_id"},
+				bson.M{"$set": bson.M{"seq": paymentID - 1}},
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		if len(withdrawals) > 0 {
+			_, err = db.Collection("withdrawals").InsertMany(ctx, withdrawals)
+			if err != nil {
+				return err
+			}
+			log.Printf("Seeded %d withdrawals", len(withdrawals))
+
+			// Update withdrawal counter
+			_, err = db.Collection("counters").UpdateOne(
+				ctx,
+				bson.M{"_id": "withdrawal_id"},
+				bson.M{"$set": bson.M{"seq": withdrawalID - 1}},
+			)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// Initialize other counters if they don't exist
 	counters := []string{
 		"transaction_id",
@@ -304,128 +625,6 @@ func seedInitialData(ctx context.Context, db *mongo.Database) error {
 			if err != nil {
 				return err
 			}
-		}
-	}
-
-	return nil
-}
-
-// EnsureCollectionIndexes ensures that all required indexes are created
-func EnsureCollectionIndexes(db *mongo.Database) error {
-	// Create indexes for collections
-	indexes := map[string][]mongo.IndexModel{
-		"users": {
-			{
-				Keys:    bson.D{{Key: "email", Value: 1}},
-				Options: options.Index().SetUnique(true),
-			},
-			{
-				Keys:    bson.D{{Key: "referral_code", Value: 1}},
-				Options: options.Index().SetUnique(true),
-			},
-			{
-				Keys: bson.D{{Key: "referred_by", Value: 1}},
-			},
-		},
-		"transactions": {
-			{
-				Keys: bson.D{{Key: "user_id", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "type", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "status", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "created_at", Value: -1}},
-			},
-		},
-		"payments": {
-			{
-				Keys: bson.D{{Key: "transaction_id", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "gateway_reference", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "status", Value: 1}},
-			},
-		},
-		"withdrawals": {
-			{
-				Keys: bson.D{{Key: "user_id", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "transaction_id", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "status", Value: 1}},
-			},
-		},
-		"kyc_documents": {
-			{
-				Keys: bson.D{{Key: "user_id", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "status", Value: 1}},
-			},
-		},
-		"devices": {
-			{
-				Keys:    bson.D{{Key: "device_id", Value: 1}},
-				Options: options.Index().SetUnique(true),
-			},
-			{
-				Keys: bson.D{{Key: "user_id", Value: 1}},
-			},
-		},
-		"notifications": {
-			{
-				Keys: bson.D{{Key: "user_id", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "is_read", Value: 1}},
-			},
-		},
-		"tasks": {
-			{
-				Keys: bson.D{{Key: "is_mandatory", Value: 1}},
-			},
-		},
-		"user_tasks": {
-			{
-				Keys:    bson.D{{Key: "user_id", Value: 1}, {Key: "task_id", Value: 1}},
-				Options: options.Index().SetUnique(true),
-			},
-		},
-		"support_tickets": {
-			{
-				Keys: bson.D{{Key: "user_id", Value: 1}},
-			},
-			{
-				Keys: bson.D{{Key: "status", Value: 1}},
-			},
-		},
-		"support_messages": {
-			{
-				Keys: bson.D{{Key: "ticket_id", Value: 1}},
-			},
-		},
-		"news": {
-			{
-				Keys: bson.D{{Key: "is_published", Value: 1}},
-			},
-		},
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	for collectionName, collectionIndexes := range indexes {
-		_, err := db.Collection(collectionName).Indexes().CreateMany(ctx, collectionIndexes)
-		if err != nil {
-			return err
 		}
 	}
 

@@ -730,3 +730,71 @@ func (c *AdminController) SendNotification(ctx *gin.Context) {
 		"message": "Notification sent successfully to all users",
 	})
 }
+
+// GetUserStats gets statistics about users for the admin dashboard
+func (c *AdminController) GetUserStats(ctx *gin.Context) {
+	// Get all users (no pagination)
+	users, err := c.userService.GetAllUsers(0, 0)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get users"})
+		return
+	}
+
+	// Count active, blocked, and verified users
+	activeUsers := 0
+	blockedUsers := 0
+	verifiedUsers := 0
+	for _, user := range users {
+		if !user.IsBlocked {
+			activeUsers++
+		} else {
+			blockedUsers++
+		}
+		if user.IsKYCVerified {
+			verifiedUsers++
+		}
+	}
+
+	// Calculate plan distribution
+	planDistribution := make([]map[string]interface{}, 0)
+
+	// Get all plans
+	plans, err := c.planService.GetAllPlans()
+	if err == nil && len(plans) > 0 {
+		// Count users per plan
+		planCounts := make(map[int64]int)
+		planNames := make(map[int64]string)
+
+		// Initialize plan counts
+		for _, plan := range plans {
+			planCounts[plan.ID] = 0
+			planNames[plan.ID] = plan.Name
+		}
+
+		// Count users per plan
+		for _, user := range users {
+			if _, exists := planCounts[user.PlanID]; exists {
+				planCounts[user.PlanID]++
+			}
+		}
+
+		// Convert to response format
+		for planID, count := range planCounts {
+			if count > 0 { // Only include plans with users
+				planDistribution = append(planDistribution, map[string]interface{}{
+					"name":  planNames[planID],
+					"value": count,
+				})
+			}
+		}
+	}
+
+	// Return user statistics
+	ctx.JSON(http.StatusOK, gin.H{
+		"total_users":       len(users),
+		"active_users":      activeUsers,
+		"blocked_users":     blockedUsers,
+		"verified_users":    verifiedUsers,
+		"plan_distribution": planDistribution,
+	})
+}
