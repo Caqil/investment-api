@@ -12,9 +12,10 @@ import {
   useRecentActivity,
 } from "@/hooks/use-dashboard-data";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TransactionStatus, TransactionType } from "@/types/transaction";
 import { PendingActions } from "@/components/dashboard/pending-action";
 import { RecentUsers } from "@/components/users/recen-user";
+import { api } from "@/lib/api";
+import { Transaction } from "@/types/transaction";
 
 export default function DashboardPage() {
   const {
@@ -35,54 +36,49 @@ export default function DashboardPage() {
     error: activitiesError,
   } = useRecentActivity();
 
-  // Mock transactions for demonstration
-  const mockTransactions = [
-    {
-      id: 1,
-      user_id: recentUsers[0]?.id,
-      amount: 1000,
-      type: TransactionType.DEPOSIT,
-      status: TransactionStatus.COMPLETED,
-      description: "Initial deposit",
-      created_at: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 2,
-      user_id: recentUsers[1]?.id,
-      amount: 500,
-      type: TransactionType.WITHDRAWAL,
-      status: TransactionStatus.PENDING,
-      description: "Withdrawal request",
-      created_at: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 3,
-      user_id: recentUsers[0]?.id,
-      amount: 50,
-      type: TransactionType.BONUS,
-      status: TransactionStatus.COMPLETED,
-      description: "Daily bonus",
-      created_at: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 4,
-      user_id: recentUsers[2]?.id,
-      amount: 100,
-      type: TransactionType.DEPOSIT,
-      status: TransactionStatus.COMPLETED,
-      description: "Manual deposit",
-      created_at: new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString(),
-    },
-    {
-      id: 5,
-      user_id: recentUsers[1]?.id,
-      amount: 200,
-      type: TransactionType.BONUS,
-      status: TransactionStatus.COMPLETED,
-      description: "Referral bonus",
-      created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
+    []
+  );
+  const [transactionsLoading, setTransactionsLoading] = useState(true);
+
+  // Fetch recent transactions
+  useEffect(() => {
+    const fetchRecentTransactions = async () => {
+      setTransactionsLoading(true);
+
+      try {
+        const response = await api.transactions.getRecentTransactions(5);
+
+        if (response.error) {
+          console.error("Error fetching recent transactions:", response.error);
+          setRecentTransactions([]);
+          return;
+        }
+
+        // Check if data exists and has transactions property
+        if (
+          response.data &&
+          typeof response.data === "object" &&
+          "transactions" in response.data
+        ) {
+          setRecentTransactions(response.data.transactions || []);
+        } else {
+          setRecentTransactions([]);
+          console.warn(
+            "API response didn't include expected 'transactions' property:",
+            response.data
+          );
+        }
+      } catch (err) {
+        console.error("Error fetching transactions:", err);
+        setRecentTransactions([]);
+      } finally {
+        setTransactionsLoading(false);
+      }
+    };
+
+    fetchRecentTransactions();
+  }, []);
 
   return (
     <DashboardShell>
@@ -129,12 +125,12 @@ export default function DashboardPage() {
           <PendingActions
             pendingWithdrawals={pendingWithdrawals}
             pendingKyc={pendingKyc}
-            pendingPayments={3} // Mock value for demonstration
+            pendingPayments={3} // This could also be fetched from API
             loading={isLoading}
           />
           <RecentTransactions
-            transactions={mockTransactions}
-            loading={isLoading}
+            transactions={recentTransactions}
+            loading={isLoading || transactionsLoading}
             showUser={true}
             users={recentUsers}
           />

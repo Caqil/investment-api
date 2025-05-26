@@ -15,7 +15,7 @@ export enum TransactionStatus {
 
 export interface Transaction {
   id: number;
-  user_id?: number;  // Made optional to handle cases where user_id might not exist
+  user_id: number;  // Made optional to handle cases where user_id might not exist
   amount: number;
   type: TransactionType;
   status: TransactionStatus;

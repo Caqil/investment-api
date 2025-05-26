@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api";
 
 interface StatsCardProps {
   title: string;
@@ -75,54 +77,121 @@ export function StatsCard({
   );
 }
 
-interface DashboardStatsProps {
-  totalUsers: number;
-  activeUsers: number;
-  pendingWithdrawals: number;
-  pendingKyc: number;
-  loading: boolean;
-}
+export function DashboardStats() {
+  // State for statistics
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    pendingWithdrawals: 0,
+    pendingKyc: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-export function DashboardStats({
-  totalUsers,
-  activeUsers,
-  pendingWithdrawals,
-  pendingKyc,
-  loading,
-}: DashboardStatsProps) {
+  // Fetch dashboard statistics from the API
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // Use the appropriate API endpoint to fetch the dashboard stats
+        const response = await api.dashboard.getStats();
+
+        if (response.error) {
+          setError(response.error);
+          return;
+        }
+
+        // Check if data exists and has the expected properties
+        if (response.data) {
+          const {
+            users_count,
+            active_users_count,
+            pending_withdrawals_count,
+            pending_kyc_count,
+          } = response.data;
+
+          setStats({
+            totalUsers: users_count || 0,
+            activeUsers: active_users_count || 0,
+            pendingWithdrawals: pending_withdrawals_count || 0,
+            pendingKyc: pending_kyc_count || 0,
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching dashboard stats:", err);
+        setError("Failed to load dashboard statistics");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardStats();
+  }, []);
+
+  // Calculate active users percentage, handling division by zero
+  const activePercentage =
+    stats.totalUsers > 0
+      ? Math.round((stats.activeUsers / stats.totalUsers) * 100)
+      : 0;
+
+  // Create appropriate descriptions
+  const activeUsersDescription =
+    stats.totalUsers > 0
+      ? `${activePercentage}% of total`
+      : "No users registered yet";
+
+  const pendingWithdrawalsDescription =
+    stats.pendingWithdrawals > 0 ? "Awaiting approval" : "No pending requests";
+
+  const pendingKycDescription =
+    stats.pendingKyc > 0 ? "Awaiting verification" : "No pending verifications";
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <StatsCard
         title="Total Users"
-        value={totalUsers}
+        value={stats.totalUsers}
+        description={
+          stats.totalUsers > 0 ? "Registered accounts" : "No users yet"
+        }
         icon={<User className="h-4 w-4" />}
         loading={loading}
       />
 
       <StatsCard
         title="Active Users"
-        value={activeUsers}
-        description={`${Math.round(
-          (activeUsers / totalUsers) * 100
-        )}% of total`}
+        value={stats.activeUsers}
+        description={activeUsersDescription}
         icon={<UserCheck className="h-4 w-4" />}
         loading={loading}
-        trend={activeUsers > 0 ? "up" : "neutral"}
+        trend={stats.activeUsers > 0 && stats.totalUsers > 0 ? "up" : "neutral"}
       />
 
       <StatsCard
         title="Pending Withdrawals"
-        value={pendingWithdrawals}
+        value={stats.pendingWithdrawals}
+        description={pendingWithdrawalsDescription}
         icon={<CreditCard className="h-4 w-4" />}
         loading={loading}
+        trend={stats.pendingWithdrawals > 0 ? "up" : "neutral"}
       />
 
       <StatsCard
         title="Pending KYC"
-        value={pendingKyc}
+        value={stats.pendingKyc}
+        description={pendingKycDescription}
         icon={<ShieldAlert className="h-4 w-4" />}
         loading={loading}
+        trend={stats.pendingKyc > 0 ? "up" : "neutral"}
       />
+
+      {error && (
+        <div className="col-span-full p-3 mt-2 bg-red-50 border border-red-200 text-red-600 rounded-md">
+          {error}
+        </div>
+      )}
     </div>
   );
 }

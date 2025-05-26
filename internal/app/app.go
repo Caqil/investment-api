@@ -32,15 +32,25 @@ func (a *App) SetupRoutes() *gin.Engine {
 
 	r := gin.Default()
 
-	// CORS configuration
-	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With", "X-CSRF-Token", "X-Device-ID"},
-		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
-		MaxAge:           12 * 60 * 60, // 12 hours
-	}))
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = []string{"http://localhost:3000", "http://127.0.0.1:3000", "http://your-production-domain.com"}
+	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
+	corsConfig.AllowHeaders = []string{
+		"Origin",
+		"Content-Type",
+		"Accept",
+		"Authorization",
+		"X-Requested-With",
+		"X-CSRF-Token",
+		"X-Device-ID",
+		"Cache-Control",
+		"Pragma",
+	}
+	corsConfig.ExposeHeaders = []string{"Content-Length", "Content-Type"}
+	corsConfig.AllowCredentials = true
+	corsConfig.MaxAge = 12 * 60 * 60 // 12 hours
+
+	r.Use(cors.New(corsConfig))
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(a.mongoConn)
@@ -52,7 +62,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 	kycRepo := repository.NewKYCRepository(a.mongoConn)
 	deviceRepo := repository.NewDeviceRepository(a.mongoConn)
 	notificationRepo := repository.NewNotificationRepository(a.mongoConn)
-
+	transactionController := controller.NewTransactionController(transactionRepo)
 	// Initialize services
 	deviceService := service.NewDeviceService(deviceRepo)
 	emailService := utils.NewEmailService(a.config.Email)
@@ -86,6 +96,7 @@ func (a *App) SetupRoutes() *gin.Engine {
 			MinimumWithdrawalAmount: a.config.App.MinimumWithdrawalAmount,
 		},
 	)
+
 	kycService := service.NewKYCService(kycRepo, userRepo)
 	notificationService := service.NewNotificationService(notificationRepo, emailService)
 
@@ -107,7 +118,11 @@ func (a *App) SetupRoutes() *gin.Engine {
 		notificationService,
 		bonusService,
 	)
-
+	dashboardController := controller.NewDashboardController(
+		userService,
+		withdrawalService,
+		kycService,
+	)
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(a.jwtService.GetJWTManager(), userRepo)
 	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService)
@@ -220,9 +235,11 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.POST("/tasks", adminController.CreateTask)
 		adminAPI.PUT("/tasks/:id", adminController.UpdateTask)
 		adminAPI.DELETE("/tasks/:id", adminController.DeleteTask)
-
+		adminAPI.GET("/transactions", transactionController.GetAllTransactions)
+		adminAPI.GET("/users/:id/transactions", transactionController.GetUserTransactions) // This is the new route we're adding
 		// Admin notification management
 		adminAPI.POST("/notifications", adminController.SendNotification)
+		adminAPI.GET("/stats", dashboardController.GetDashboardStats)
 	}
 
 	return r

@@ -74,7 +74,6 @@ export function UserDetail({ userId, initialUserData }: UserDetailProps) {
       setLoading(false);
     }
   };
-
   // Fetch user transactions
   const fetchTransactions = async () => {
     if (activeTab !== "transactions") return;
@@ -82,45 +81,24 @@ export function UserDetail({ userId, initialUserData }: UserDetailProps) {
     setTransactionsLoading(true);
 
     try {
-      // This is a placeholder as we don't have the exact API endpoint
-      // In a real implementation, you would call something like:
-      // const response = await api.transactions.getByUserId(userId);
+      const response = await api.transactions.getByUserId(userId);
 
-      // Mock data for now
-      const mockTransactions: Transaction[] = [
-        {
-          id: 1,
-          amount: 500,
-          type: TransactionType.DEPOSIT,
-          status: TransactionStatus.COMPLETED,
-          description: "Initial deposit",
-          created_at: new Date(
-            Date.now() - 7 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-        },
-        {
-          id: 2,
-          amount: 100,
-          type: TransactionType.WITHDRAWAL,
-          status: TransactionStatus.PENDING,
-          description: "Withdrawal request",
-          created_at: new Date(
-            Date.now() - 2 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-        },
-        {
-          id: 3,
-          amount: 25,
-          type: TransactionType.BONUS,
-          status: TransactionStatus.COMPLETED,
-          description: "Daily bonus",
-          created_at: new Date(
-            Date.now() - 1 * 24 * 60 * 60 * 1000
-          ).toISOString(),
-        },
-      ];
+      if (response.error) {
+        console.error("Error fetching transactions:", response.error);
+        return;
+      }
 
-      setTransactions(mockTransactions);
+      // Check if the response contains the transactions property
+      if (response.data && "transactions" in response.data) {
+        setTransactions(response.data.transactions || []);
+      } else {
+        // Handle case where transactions property doesn't exist
+        setTransactions([]);
+        console.warn(
+          "API response didn't include expected 'transactions' property:",
+          response.data
+        );
+      }
     } catch (err) {
       console.error("Error fetching transactions:", err);
     } finally {

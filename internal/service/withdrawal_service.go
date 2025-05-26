@@ -280,3 +280,14 @@ func (s *WithdrawalService) CheckWithdrawalLimit(userID int64, amount float64) (
 
 	return true, plan.DailyWithdrawalLimit - todayTotal, nil
 }
+
+// GetPendingWithdrawalsCount returns the count of pending withdrawals
+func (s *WithdrawalService) GetPendingWithdrawalsCount() (int, error) {
+	count, err := s.withdrawalRepo.CountByStatus(model.WithdrawalStatusPending)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert int64 to int
+	return int(count), nil
+}

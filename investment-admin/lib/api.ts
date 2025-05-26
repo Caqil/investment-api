@@ -84,7 +84,6 @@ export interface NotificationsResponse {
 export interface MessageResponse {
   message: string;
 }
-
 export interface StatsResponse {
   total_users: number;
   active_users: number;
@@ -306,11 +305,18 @@ export const api = {
   },
   
   // Transaction endpoints
-  transactions: {
-    getAll: (): Promise<ApiResponse<TransactionsResponse>> => {
-      return request<TransactionsResponse>('/admin/transactions');
-    }
+// Update the transactions section in lib/api.ts
+transactions: {
+  getAll: (): Promise<ApiResponse<TransactionsResponse>> => {
+    return request<TransactionsResponse>('/admin/transactions');
   },
+  getByUserId: (userId: number, limit: number = 10, offset: number = 0): Promise<ApiResponse<TransactionsResponse>> => {
+    return request<TransactionsResponse>(`/admin/users/${userId}/transactions?limit=${limit}&offset=${offset}`);
+  },
+  getRecentTransactions: (limit: number = 5): Promise<ApiResponse<TransactionsResponse>> => {
+    return request<TransactionsResponse>(`/admin/transactions/recent?limit=${limit}`);
+  }
+},
   
   // Notification endpoints
   notifications: {
