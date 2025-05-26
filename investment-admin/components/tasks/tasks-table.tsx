@@ -100,7 +100,7 @@ export function TasksTable({
             <AlertTriangle className="h-6 w-6 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium">No tasks found</h3>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm  mt-1">
             There are no tasks matching your criteria.
           </p>
         </div>
@@ -112,63 +112,63 @@ export function TasksTable({
     <>
       <div className="border rounded-md overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y">
+            <thead>
               <tr>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium  uppercase tracking-wider"
                 >
                   ID
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium  uppercase tracking-wider"
                 >
                   Name
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium  uppercase tracking-wider"
                 >
                   Description
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium  uppercase tracking-wider"
                 >
                   Type
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-left text-xs font-medium  uppercase tracking-wider"
                 >
                   Mandatory
                 </th>
                 <th
                   scope="col"
-                  className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
+                  className="px-6 py-3 text-right text-xs font-medium  uppercase tracking-wider"
                 >
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="divide-y">
               {tasks.map((task) => (
                 <tr key={task.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {task.id}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm ">
                     {task.name}
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500 max-w-xs">
+                  <td className="px-6 py-4 text-sm  max-w-xs">
                     {truncateString(task.description, 100)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm ">
                     {getTaskTypeBadge(task.task_type)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm ">
                     {task.is_mandatory ? (
                       <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">
                         Required

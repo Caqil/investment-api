@@ -1,4 +1,3 @@
-// investment-admin/app/users/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,45 +7,85 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { User } from "@/types/auth";
-import { AlertCircle, Plus, RefreshCw, Search } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Skeleton } from "@/components/ui/skeleton";
-import { formatDate } from "@/lib/utils";
-import { UserStats } from "@/components/users/user-stats";
+import { AlertCircle, RefreshCw, Search, Users } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
+  CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal } from "lucide-react";
-import { RecentUsers } from "@/components/users/recent-user";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { UsersTable } from "@/components/users/user-table";
+import { CreateUserDialog } from "@/components/users/create-user-dialog";
+
+// Stats component for user metrics
+function UserStats({ stats, loading }: { stats: any; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <Card key={i} className="p-6">
+            <div className="flex items-center space-x-4">
+              <div className="h-12 w-12 rounded-full bg-gray-200 animate-pulse"></div>
+              <div className="space-y-2">
+                <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            </div>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-3 mb-6">
+      <Card className="p-6">
+        <div className="flex items-center space-x-4">
+          <div className="p-2 bg-blue-100 rounded-full">
+            <Users className="h-6 w-6 text-blue-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">Total Users</p>
+            <h3 className="text-2xl font-bold">{stats.total_users || 0}</h3>
+          </div>
+        </div>
+      </Card>
+      <Card className="p-6">
+        <div className="flex items-center space-x-4">
+          <div className="p-2 bg-green-100 rounded-full">
+            <Users className="h-6 w-6 text-green-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">Active Users</p>
+            <h3 className="text-2xl font-bold">{stats.active_users || 0}</h3>
+          </div>
+        </div>
+      </Card>
+      <Card className="p-6">
+        <div className="flex items-center space-x-4">
+          <div className="p-2 bg-purple-100 rounded-full">
+            <Users className="h-6 w-6 text-purple-600" />
+          </div>
+          <div>
+            <p className="text-sm font-medium text-gray-500">Verified Users</p>
+            <h3 className="text-2xl font-bold">{stats.verified_users || 0}</h3>
+          </div>
+        </div>
+      </Card>
+    </div>
+  );
+}
 
 export default function UsersPage() {
   const router = useRouter();
@@ -55,20 +94,21 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [activeTab, setActiveTab] = useState("all");
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-
-  // User statistics
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
-    blockedUsers: 0,
-    verifiedUsers: 0,
-    planDistribution: [] as Array<{ name: string; value: number }>,
-  });
-
-  // Sort users by registration date (newest first)
-  const sortedUsers = [...users].sort((a, b) => {
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  const [stats, setStats] = useState<{
+    total_users: number;
+    active_users: number;
+    blocked_users: number;
+    verified_users: number;
+    plan_distribution: Array<{ name: string; value: number }>;
+  }>({
+    total_users: 0,
+    active_users: 0,
+    blocked_users: 0,
+    verified_users: 0,
+    plan_distribution: [],
   });
 
   const fetchUsers = async () => {
@@ -85,39 +125,11 @@ export default function UsersPage() {
       const fetchedUsers = response.data?.users || [];
       setUsers(fetchedUsers);
 
-      // Calculate stats
-      const totalUsers = fetchedUsers.length;
-      const activeUsers = fetchedUsers.filter(
-        (user) => !user.is_blocked
-      ).length;
-      const blockedUsers = fetchedUsers.filter(
-        (user) => user.is_blocked
-      ).length;
-      const verifiedUsers = fetchedUsers.filter(
-        (user) => user.is_kyc_verified
-      ).length;
-
-      // Calculate plan distribution
-      const planCounts: Record<string, number> = {};
-      fetchedUsers.forEach((user) => {
-        const planId = user.plan_id || "Unknown";
-        planCounts[planId] = (planCounts[planId] || 0) + 1;
-      });
-
-      const planDistribution = Object.entries(planCounts).map(
-        ([name, value]) => ({
-          name,
-          value,
-        })
-      );
-
-      setStats({
-        totalUsers,
-        activeUsers,
-        blockedUsers,
-        verifiedUsers,
-        planDistribution,
-      });
+      // Fetch user statistics
+      const statsResponse = await api.users.getStats();
+      if (!statsResponse.error && statsResponse.data) {
+        setStats(statsResponse.data);
+      }
     } catch (err) {
       console.error("Error fetching users:", err);
       setError(err instanceof Error ? err.message : "Failed to load users");
@@ -131,97 +143,67 @@ export default function UsersPage() {
     fetchUsers();
   }, [refreshTrigger]);
 
-  // Apply search filter whenever users or searchQuery changes
+  // Apply filters whenever dependencies change
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredUsers(users);
-      return;
+    let result = [...users];
+
+    // Apply status filter based on active tab
+    if (activeTab === "active") {
+      result = result.filter((user) => !user.is_blocked);
+    } else if (activeTab === "blocked") {
+      result = result.filter((user) => user.is_blocked);
+    } else if (activeTab === "admin") {
+      result = result.filter((user) => user.is_admin);
     }
 
-    const query = searchQuery.toLowerCase();
-    const filtered = users.filter(
-      (user) =>
-        user.name.toLowerCase().includes(query) ||
-        user.email.toLowerCase().includes(query) ||
-        user.phone?.toLowerCase().includes(query) ||
-        user.id.toString().includes(query)
-    );
+    // Apply plan filter
+    if (planFilter !== "all") {
+      result = result.filter((user) => {
+        const userPlan = plans.find((plan) => plan.name === planFilter);
+        return userPlan && user.plan_id === userPlan.value;
+      });
+    }
 
-    setFilteredUsers(filtered);
-  }, [users, searchQuery]);
+    // Apply search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (user) =>
+          user.name.toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query) ||
+          user.phone.toLowerCase().includes(query) ||
+          user.id.toString().includes(query) ||
+          user.referral_code.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredUsers(result);
+  }, [users, activeTab, planFilter, searchQuery]);
+
+  const handleUserCreated = (newUser: User) => {
+    // Refresh the user list
+    setRefreshTrigger((prev) => prev + 1);
+  };
 
   const handleRefresh = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
 
-  const handleAddUser = () => {
-    router.push("/users/new");
-  };
-
-  const handleViewUser = (userId: number) => {
-    router.push(`/users/${userId}`);
-  };
-
-  const handleBlockUser = async (userId: number) => {
-    try {
-      const response = await api.users.block(userId);
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      // Refresh the list
-      handleRefresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to block user");
-    }
-  };
-
-  const handleUnblockUser = async (userId: number) => {
-    try {
-      const response = await api.users.unblock(userId);
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      // Refresh the list
-      handleRefresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to unblock user");
-    }
-  };
-
-  const handleDeleteUser = async (userId: number) => {
-    if (
-      !confirm(
-        "Are you sure you want to delete this user? This action cannot be undone."
-      )
-    ) {
-      return;
-    }
-
-    try {
-      const response = await api.users.delete(userId);
-      if (response.error) {
-        throw new Error(response.error);
-      }
-      // Refresh the list
-      handleRefresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete user");
-    }
-  };
+  // Get unique plans for filter
+  const plans = stats.plan_distribution || [];
 
   return (
     <DashboardShell>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-        <div className="flex space-x-2">
+        <div className="flex items-center gap-2">
           <Button onClick={handleRefresh} variant="outline" size="sm">
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button onClick={handleAddUser} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add User
-          </Button>
+
+          {/* Using the CreateUserDialog component */}
+          <CreateUserDialog onSuccess={handleUserCreated} />
         </div>
       </div>
 
@@ -235,115 +217,91 @@ export default function UsersPage() {
 
       {/* User Statistics */}
       <UserStats stats={stats} loading={loading} />
-      {/* Search Bar */}
-      <div className="flex mb-6">
-        <Input
-          placeholder="Search users by name, email, phone..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="max-w-sm"
-        />
+
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex-1">
+          <Input
+            placeholder="Search by name, email, phone, ID..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="max-w-sm"
+            disabled={loading}
+          />
+        </div>
+        <Select
+          value={planFilter}
+          onValueChange={setPlanFilter}
+          disabled={loading}
+        >
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by plan" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Plans</SelectItem>
+            {plans.map((plan: { name: string; value: number }) => (
+              <SelectItem key={plan.name} value={plan.name}>
+                {plan.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Users Table */}
-      {loading ? (
-        <div className="space-y-3">
-          <Skeleton className="h-10 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-          <Skeleton className="h-20 w-full" />
-        </div>
-      ) : filteredUsers.length > 0 ? (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[50px]">ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Balance</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Joined</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">{user.id}</TableCell>
-                  <TableCell>{user.name}</TableCell>
-                  <TableCell>{user.email}</TableCell>
-                  <TableCell>{user.phone}</TableCell>
-                  <TableCell>${user.balance.toFixed(2)}</TableCell>
-                  <TableCell>
-                    {user.is_blocked ? (
-                      <Badge variant="destructive">Blocked</Badge>
-                    ) : (
-                      <Badge variant="outline">Active</Badge>
-                    )}
-                    {user.is_admin && (
-                      <Badge variant="secondary" className="ml-2">
-                        Admin
-                      </Badge>
-                    )}
-                    {user.is_kyc_verified && (
-                      <Badge variant="default" className="ml-2">
-                        Verified
-                      </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>{formatDate(user.created_at)}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => handleViewUser(user.id)}
-                        >
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {user.is_blocked ? (
-                          <DropdownMenuItem
-                            onClick={() => handleUnblockUser(user.id)}
-                          >
-                            Unblock User
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem
-                            onClick={() => handleBlockUser(user.id)}
-                          >
-                            Block User
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => handleDeleteUser(user.id)}
-                        >
-                          Delete User
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
+      {/* Tabs for filtering by status */}
+      <Tabs
+        defaultValue="all"
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="mb-6"
+      >
+        <TabsList>
+          <TabsTrigger value="all">All Users</TabsTrigger>
+          <TabsTrigger value="active">Active</TabsTrigger>
+          <TabsTrigger value="blocked">Blocked</TabsTrigger>
+          <TabsTrigger value="admin">Admins</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="all" className="mt-4">
+          <UsersTable
+            users={filteredUsers}
+            loading={loading}
+            onRefresh={handleRefresh}
+          />
+        </TabsContent>
+
+        <TabsContent value="active" className="mt-4">
+          <UsersTable
+            users={filteredUsers}
+            loading={loading}
+            onRefresh={handleRefresh}
+          />
+        </TabsContent>
+
+        <TabsContent value="blocked" className="mt-4">
+          <UsersTable
+            users={filteredUsers}
+            loading={loading}
+            onRefresh={handleRefresh}
+          />
+        </TabsContent>
+
+        <TabsContent value="admin" className="mt-4">
+          <UsersTable
+            users={filteredUsers}
+            loading={loading}
+            onRefresh={handleRefresh}
+          />
+        </TabsContent>
+      </Tabs>
+
+      {filteredUsers.length === 0 && !loading && (
         <Card>
           <CardHeader>
             <CardTitle>No users found</CardTitle>
             <CardDescription>
-              {searchQuery
-                ? "Try adjusting your search query"
+              {searchQuery || planFilter !== "all"
+                ? "Try adjusting your filters"
                 : "There are no users to display"}
             </CardDescription>
           </CardHeader>
