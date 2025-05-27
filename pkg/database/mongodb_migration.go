@@ -60,7 +60,10 @@ func RunMongoDBMigrations(conn *MongoDBConnection) error {
 	if err != nil {
 		return err
 	}
-
+	err = ensureRequiredSettings(ctx, conn.Database)
+	if err != nil {
+		return err
+	}
 	log.Println("MongoDB migrations completed successfully")
 	return nil
 }
@@ -260,6 +263,18 @@ func seedInitialData(ctx context.Context, db *mongo.Database) error {
 				CreatedAt:   time.Now(),
 				UpdatedAt:   time.Now(),
 			},
+			// Add the device check setting
+			&model.Setting{
+				ID:          16,
+				Key:         "enable_device_check",
+				Value:       "true", // Default to enabled
+				Type:        model.SettingTypeBoolean,
+				DisplayName: "Enable Device Check",
+				Description: "If enabled, users can only register one account per device. If disabled, multiple accounts can be registered from the same device.",
+				Group:       "system",
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			},
 		}
 
 		_, err = db.Collection("settings").InsertMany(ctx, settings)
@@ -271,7 +286,7 @@ func seedInitialData(ctx context.Context, db *mongo.Database) error {
 		// Set up counter for settings
 		_, err = db.Collection("counters").InsertOne(ctx, bson.M{
 			"_id": "setting_id",
-			"seq": int64(15), // Starting after the last inserted setting
+			"seq": int64(16), // Updated to account for the new setting
 		})
 		if err != nil {
 			return err
@@ -816,6 +831,64 @@ func seedInitialData(ctx context.Context, db *mongo.Database) error {
 				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+// Add this function to pkg/database/mongodb_migration.go
+
+// ensureRequiredSettings ensures that certain required settings exist
+func ensureRequiredSettings(ctx context.Context, db *mongo.Database) error {
+	// Check if device check setting exists
+	deviceCheckCount, err := db.Collection("settings").CountDocuments(ctx, bson.M{"key": "enable_device_check"})
+	if err != nil {
+		return err
+	}
+
+	if deviceCheckCount == 0 {
+		// Get next ID for the setting
+		var counter struct {
+			ID  string `bson:"_id"`
+			Seq int64  `bson:"seq"`
+		}
+
+		err := db.Collection("counters").FindOne(ctx, bson.M{"_id": "setting_id"}).Decode(&counter)
+		if err != nil {
+			return err
+		}
+
+		nextID := counter.Seq + 1
+
+		// Create device check setting
+		deviceCheckSetting := model.Setting{
+			ID:          nextID,
+			Key:         "enable_device_check",
+			Value:       "true", // Default to enabled
+			Type:        model.SettingTypeBoolean,
+			DisplayName: "Enable Device Check",
+			Description: "If enabled, users can only register one account per device. If disabled, multiple accounts can be registered from the same device.",
+			Group:       "system",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+
+		_, err = db.Collection("settings").InsertOne(ctx, deviceCheckSetting)
+		if err != nil {
+			return err
+		}
+
+		// Update the counter
+		_, err = db.Collection("counters").UpdateOne(
+			ctx,
+			bson.M{"_id": "setting_id"},
+			bson.M{"$set": bson.M{"seq": nextID}},
+		)
+		if err != nil {
+			return err
+		}
+
+		log.Println("Added device check setting")
 	}
 
 	return nil

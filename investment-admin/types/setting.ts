@@ -26,4 +26,5 @@ export interface AppSettings {
   maintenance_mode: boolean;
   enable_withdrawals: boolean;
   enable_deposits: boolean;
+  enable_device_check: boolean;
 }

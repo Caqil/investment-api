@@ -12,7 +12,8 @@ type AuthController struct {
 	userService         *service.UserService
 	deviceService       *service.DeviceService
 	planService         *service.PlanService
-	notificationService *service.NotificationService // Add this field
+	notificationService *service.NotificationService
+	settingService      *service.SettingService // Add this field
 }
 
 func NewAuthController(
@@ -20,14 +21,16 @@ func NewAuthController(
 	userService *service.UserService,
 	deviceService *service.DeviceService,
 	planService *service.PlanService,
-	notificationService *service.NotificationService, // Add this parameter
+	notificationService *service.NotificationService,
+	settingService *service.SettingService, // Add this parameter
 ) *AuthController {
 	return &AuthController{
 		authService:         authService,
 		userService:         userService,
 		deviceService:       deviceService,
 		planService:         planService,
-		notificationService: notificationService, // Assign the field
+		notificationService: notificationService,
+		settingService:      settingService, // Assign the field
 	}
 }
 
@@ -69,18 +72,27 @@ func (c *AuthController) Register(ctx *gin.Context) {
 		return
 	}
 
-	// Check if device is already registered
-	isRegistered, err := c.deviceService.IsDeviceRegistered(req.DeviceID)
+	// Check if device checking is enabled
+	deviceCheckEnabled, err := c.settingService.GetSettingValueBool("enable_device_check")
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check device"})
-		return
+		deviceCheckEnabled = true // Default to enabled if setting not found
 	}
-	if isRegistered {
-		ctx.JSON(http.StatusBadRequest, gin.H{
-			"error":           "Device already registered",
-			"contact_support": true,
-		})
-		return
+
+	// Only check device if device checking is enabled
+	if deviceCheckEnabled {
+		// Check if device is already registered
+		isRegistered, err := c.deviceService.IsDeviceRegistered(req.DeviceID)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to check device"})
+			return
+		}
+		if isRegistered {
+			ctx.JSON(http.StatusBadRequest, gin.H{
+				"error":           "Device already registered",
+				"contact_support": true,
+			})
+			return
+		}
 	}
 
 	// Check for virtual device or emulator
@@ -104,6 +116,13 @@ func (c *AuthController) Register(ctx *gin.Context) {
 	)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user: " + err.Error()})
+		return
+	}
+
+	// Register device
+	err = c.deviceService.RegisterDevice(user.ID, req.DeviceID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register device"})
 		return
 	}
 

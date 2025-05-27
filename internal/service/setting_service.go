@@ -348,7 +348,12 @@ func (s *SettingService) GetAppSettings() (*AppSettings, error) {
 	} else {
 		settings.EnableWithdrawals = true // Default value
 	}
-
+	enableDeviceCheck, err := s.GetSettingValueBool("enable_device_check")
+	if err == nil {
+		settings.EnableDeviceCheck = enableDeviceCheck
+	} else {
+		settings.EnableDeviceCheck = true // Default to true if setting not found
+	}
 	// Enable deposits
 	enableDeposits, err := s.GetSettingValueBool("enable_deposits")
 	if err == nil {
@@ -372,4 +377,5 @@ type AppSettings struct {
 	MaintenanceMode          bool    `json:"maintenance_mode"`
 	EnableWithdrawals        bool    `json:"enable_withdrawals"`
 	EnableDeposits           bool    `json:"enable_deposits"`
+	EnableDeviceCheck        bool    `json:"enable_device_check"`
 }

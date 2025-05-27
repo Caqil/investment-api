@@ -16,6 +16,7 @@ import { formatDate } from "@/lib/utils";
 import { Pencil, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeleteTaskDialog } from "./delete-task-dialog";
+import { TablePagination } from "../ui/table-pagination";
 
 interface TasksTableProps {
   tasks: Task[];
@@ -33,6 +34,22 @@ export function TasksTable({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalItems = tasks.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  // Get current page data
+  const currentTasks = tasks.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   const handleDeleteClick = (task: Task) => {
     setSelectedTask(task);
     setDeleteDialogOpen(true);
@@ -41,29 +58,13 @@ export function TasksTable({
   const getTaskTypeLabel = (type: TaskType) => {
     switch (type) {
       case TaskType.FOLLOW:
-        return (
-          <Badge variant="outline" className="bg-blue-50 text-blue-700">
-            Follow
-          </Badge>
-        );
+        return <Badge variant="outline">Follow</Badge>;
       case TaskType.LIKE:
-        return (
-          <Badge variant="outline" className="bg-purple-50 text-purple-700">
-            Like
-          </Badge>
-        );
+        return <Badge variant="outline">Like</Badge>;
       case TaskType.INSTALL:
-        return (
-          <Badge variant="outline" className="bg-green-50 text-green-700">
-            Install
-          </Badge>
-        );
+        return <Badge variant="outline">Install</Badge>;
       default:
-        return (
-          <Badge variant="outline" className="bg-gray-50 text-gray-700">
-            {type}
-          </Badge>
-        );
+        return <Badge variant="outline">{type}</Badge>;
     }
   };
 
@@ -137,7 +138,7 @@ export function TasksTable({
                 </TableCell>
               </TableRow>
             ) : (
-              tasks.map((task) => (
+              currentTasks.map((task) => (
                 <TableRow key={task.id}>
                   <TableCell className="font-medium">{task.id}</TableCell>
                   <TableCell>
@@ -170,9 +171,7 @@ export function TasksTable({
                   </TableCell>
                   <TableCell>
                     {task.is_mandatory ? (
-                      <Badge className="bg-red-50 text-red-700 hover:bg-red-50">
-                        Required
-                      </Badge>
+                      <Badge>Required</Badge>
                     ) : (
                       <Badge variant="outline">Optional</Badge>
                     )}
@@ -194,7 +193,7 @@ export function TasksTable({
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        className="h-8 w-8 p-0"
                         onClick={() => handleDeleteClick(task)}
                       >
                         <Trash2 className="h-4 w-4" />
@@ -207,6 +206,17 @@ export function TasksTable({
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination Component */}
+        {tasks.length > 0 && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+          />
+        )}
       </div>
 
       {/* Delete Confirmation Dialog */}

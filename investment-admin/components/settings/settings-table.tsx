@@ -28,6 +28,7 @@ import { MoreHorizontal, Save, X, Trash2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Setting, SettingType } from "@/types/setting";
 import { toast } from "sonner";
+import { SettingsHelp } from "./settings-help";
 
 interface SettingsTableProps {
   settings: Setting[];
@@ -95,17 +96,21 @@ export function SettingsTable({
     }
   };
 
-  // Render value editor based on setting type
   const renderValueEditor = (setting: Setting) => {
     switch (setting.type) {
       case SettingType.BOOLEAN:
         return (
-          <Checkbox
-            checked={editValue === "true"}
-            onCheckedChange={(checked) => {
-              setEditValue(checked ? "true" : "false");
-            }}
-          />
+          <div className="flex items-center">
+            <Checkbox
+              checked={editValue === "true"}
+              onCheckedChange={(checked) => {
+                setEditValue(checked ? "true" : "false");
+              }}
+            />
+            <span className="ml-2">
+              {editValue === "true" ? "Enabled" : "Disabled"}
+            </span>
+          </div>
         );
 
       case SettingType.NUMBER:
@@ -129,15 +134,23 @@ export function SettingsTable({
         );
     }
   };
-
-  // Format setting value based on its type
   const formatValue = (setting: Setting) => {
     switch (setting.type) {
       case SettingType.BOOLEAN:
         return setting.value === "true" ? (
-          <Badge variant="success">Enabled</Badge>
+          <Badge
+            className="bg-green-100 text-green-800 hover:bg-green-200"
+            variant="outline"
+          >
+            Enabled
+          </Badge>
         ) : (
-          <Badge variant="secondary">Disabled</Badge>
+          <Badge
+            className="bg-gray-100 text-gray-800 hover:bg-gray-200"
+            variant="outline"
+          >
+            Disabled
+          </Badge>
         );
 
       case SettingType.NUMBER:
@@ -182,7 +195,10 @@ export function SettingsTable({
             settings.map((setting) => (
               <TableRow key={setting.id}>
                 <TableCell className="font-medium">
-                  <div className="font-medium">{setting.display_name}</div>
+                  <div className="font-medium flex items-center">
+                    {setting.display_name}
+                    <SettingsHelp settingKey={setting.key} />
+                  </div>
                   <div className="text-xs text-muted-foreground">
                     {setting.key}
                   </div>

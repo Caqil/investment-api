@@ -1,11 +1,12 @@
-// investment-admin/components/notifications/notification-table.tsx
 "use client";
 
+import { useState } from "react";
 import { Notification, NotificationType } from "@/types/notification";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bell, Eye, Check, Trash } from "lucide-react";
+import { TablePagination } from "../ui/table-pagination";
 
 interface NotificationTableProps {
   notifications: Notification[];
@@ -22,44 +23,32 @@ export function NotificationTable({
   onMarkAsRead,
   onDelete,
 }: NotificationTableProps) {
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalItems = notifications.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  // Get current page data
+  const currentNotifications = notifications.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   const getTypeBadge = (type: NotificationType) => {
     switch (type) {
       case NotificationType.WITHDRAWAL:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-red-100 text-red-800 hover:bg-red-100"
-          >
-            Withdrawal
-          </Badge>
-        );
+        return <Badge variant="outline">Withdrawal</Badge>;
       case NotificationType.DEPOSIT:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-green-100 text-green-800 hover:bg-green-100"
-          >
-            Deposit
-          </Badge>
-        );
+        return <Badge variant="outline">Deposit</Badge>;
       case NotificationType.BONUS:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-          >
-            Bonus
-          </Badge>
-        );
+        return <Badge variant="secondary">Bonus</Badge>;
       case NotificationType.SYSTEM:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-blue-100 text-blue-800 hover:bg-blue-100"
-          >
-            System
-          </Badge>
-        );
+        return <Badge variant="outline">System</Badge>;
       default:
         return <Badge variant="outline">Unknown</Badge>;
     }
@@ -147,10 +136,10 @@ export function NotificationTable({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {notifications.map((notification) => (
+            {currentNotifications.map((notification) => (
               <tr
                 key={notification.id}
-                className={notification.is_read ? "" : "bg-blue-50"}
+                className={notification.is_read ? "" : "bg-muted/50"}
               >
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {notification.id}
@@ -166,19 +155,9 @@ export function NotificationTable({
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {notification.is_read ? (
-                    <Badge
-                      variant="outline"
-                      className="bg-gray-100 text-gray-800"
-                    >
-                      Read
-                    </Badge>
+                    <Badge variant="outline">Read</Badge>
                   ) : (
-                    <Badge
-                      variant="outline"
-                      className="bg-blue-100 text-blue-800"
-                    >
-                      Unread
-                    </Badge>
+                    <Badge>Unread</Badge>
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -200,7 +179,7 @@ export function NotificationTable({
                       variant="ghost"
                       size="sm"
                       onClick={() => onMarkAsRead(notification.id)}
-                      className="h-8 gap-1 text-blue-600 hover:text-blue-700 hover:bg-blue-50 ml-2"
+                      className="h-8 gap-1 ml-2"
                     >
                       <Check className="h-4 w-4" />
                       Mark Read
@@ -211,7 +190,7 @@ export function NotificationTable({
                     variant="ghost"
                     size="sm"
                     onClick={() => onDelete(notification.id)}
-                    className="h-8 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
+                    className="h-8 gap-1 ml-2"
                   >
                     <Trash className="h-4 w-4" />
                     Delete
@@ -222,6 +201,17 @@ export function NotificationTable({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Component */}
+      {notifications.length > 0 && (
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+        />
+      )}
     </div>
   );
 }

@@ -14,7 +14,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, RefreshCw, Search } from "lucide-react";
 import { useSettings } from "@/hooks/use-settings";
-import { SettingForm } from "@/components/settings/setting-form";
+import { SettingForm } from "@/components/settings/settings-form";
 import { SettingsGroup } from "@/components/settings/settings-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Setting } from "@/types/setting";
@@ -24,7 +24,7 @@ const GROUP_DESCRIPTIONS: Record<string, string> = {
   bonus: "Settings related to user bonuses and rewards",
   payment: "Payment gateway and deposit settings",
   withdrawal: "User withdrawal settings",
-  system: "System and maintenance settings",
+  system: "System, security, and application behavior settings",
   contact: "Contact information settings",
   social: "Social media links",
 };

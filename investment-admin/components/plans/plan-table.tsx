@@ -20,6 +20,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Pagination } from "@/components/ui/pagination";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -49,10 +50,15 @@ import {
   Loader2,
   Info,
   CheckCircle2,
+  StarIcon,
+  DollarSign,
+  Coins,
+  PiggyBank,
+  ArrowUpDown,
 } from "lucide-react";
 import { Plan } from "@/types/plan";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { PlanForm } from "@/components/plans/plan-form";
 
@@ -68,6 +74,10 @@ export function PlansTable() {
   const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<string>("price");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
 
   const fetchPlans = async () => {
     setLoading(true);
@@ -104,9 +114,53 @@ export function PlansTable() {
     fetchPlans();
   }, []);
 
-  const filteredPlans = plans.filter((plan) =>
-    plan.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter and sort plans
+  const filteredAndSortedPlans = (() => {
+    // First filter
+    const filtered = plans.filter((plan) =>
+      plan.name.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    // Then sort
+    return [...filtered].sort((a, b) => {
+      // Always put default plan at the top regardless of sort
+      if (a.is_default && !b.is_default) return -1;
+      if (!a.is_default && b.is_default) return 1;
+
+      // Then apply the selected sorting
+      let comparison = 0;
+
+      switch (sortBy) {
+        case "name":
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case "price":
+          comparison = a.price - b.price;
+          break;
+        case "daily_deposit_limit":
+          comparison = a.daily_deposit_limit - b.daily_deposit_limit;
+          break;
+        case "daily_withdrawal_limit":
+          comparison = a.daily_withdrawal_limit - b.daily_withdrawal_limit;
+          break;
+        case "daily_profit_limit":
+          comparison = a.daily_profit_limit - b.daily_profit_limit;
+          break;
+        default:
+          comparison = a.price - b.price;
+      }
+
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+  })();
+
+  // Get current page data
+  const getCurrentPageData = () => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredAndSortedPlans.slice(startIndex, startIndex + pageSize);
+  };
+
+  const totalPages = Math.ceil(filteredAndSortedPlans.length / pageSize);
 
   const handleEditPlan = (plan: Plan) => {
     setSelectedPlan(plan);
@@ -261,6 +315,39 @@ export function PlansTable() {
     }
   };
 
+  const handleSort = (column: string) => {
+    if (sortBy === column) {
+      // Toggle direction if same column
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+    } else {
+      // Set new column and default to ascending
+      setSortBy(column);
+      setSortDirection("asc");
+    }
+    setCurrentPage(1); // Reset to first page on sort change
+  };
+
+  // Helper function to render sort indicator
+  const renderSortIndicator = (column: string) => {
+    if (sortBy !== column) return null;
+
+    return (
+      <span className="ml-1 inline-block">
+        {sortDirection === "asc" ? "↑" : "↓"}
+      </span>
+    );
+  };
+
+  // Get row background color based on plan type
+  const getRowBgColor = (plan: Plan, index: number) => {
+    if (plan.is_default) return "bg-primary/5 hover:bg-primary/10";
+    if (plan.price === 0) return "bg-blue-50/40 hover:bg-blue-100/40";
+    if (plan.price > 10000) return "bg-purple-50/30 hover:bg-purple-100/30";
+    return index % 2 === 0
+      ? "bg-white hover:bg-gray-50"
+      : "bg-gray-50/50 hover:bg-gray-100/50";
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
@@ -270,15 +357,21 @@ export function PlansTable() {
             Manage subscription plans for your users
           </CardDescription>
         </div>
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search plans..."
-            className="pl-8"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search plans..."
+              className="pl-8 w-[220px]"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={fetchPlans}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -298,34 +391,74 @@ export function PlansTable() {
             ))}
           </div>
         ) : (
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-hidden">
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Daily Deposit Limit
+                  <TableHead
+                    className="cursor-pointer hover:bg-muted/80 transition-colors"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center">
+                      Name {renderSortIndicator("name")}
+                    </div>
                   </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Daily Withdrawal Limit
+                  <TableHead
+                    className="hidden md:table-cell cursor-pointer hover:bg-muted/80 transition-colors"
+                    onClick={() => handleSort("daily_deposit_limit")}
+                  >
+                    <div className="flex items-center">
+                      <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
+                      Daily Deposit Limit
+                      {renderSortIndicator("daily_deposit_limit")}
+                    </div>
                   </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Daily Profit Limit
+                  <TableHead
+                    className="hidden md:table-cell cursor-pointer hover:bg-muted/80 transition-colors"
+                    onClick={() => handleSort("daily_withdrawal_limit")}
+                  >
+                    <div className="flex items-center">
+                      <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
+                      Daily Withdrawal Limit
+                      {renderSortIndicator("daily_withdrawal_limit")}
+                    </div>
                   </TableHead>
-                  <TableHead>Price</TableHead>
+                  <TableHead
+                    className="hidden md:table-cell cursor-pointer hover:bg-muted/80 transition-colors"
+                    onClick={() => handleSort("daily_profit_limit")}
+                  >
+                    <div className="flex items-center">
+                      <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
+                      Daily Profit Limit
+                      {renderSortIndicator("daily_profit_limit")}
+                    </div>
+                  </TableHead>
+                  <TableHead
+                    className="cursor-pointer hover:bg-muted/80 transition-colors"
+                    onClick={() => handleSort("price")}
+                  >
+                    <div className="flex items-center">
+                      <DollarSign className="h-3.5 w-3.5 mr-1.5" />
+                      Price
+                      {renderSortIndicator("price")}
+                    </div>
+                  </TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPlans.length > 0 ? (
-                  filteredPlans.map((plan) => (
+                {getCurrentPageData().length > 0 ? (
+                  getCurrentPageData().map((plan, index) => (
                     <TableRow
                       key={plan.id}
-                      className={plan.is_default ? "bg-primary/5" : ""}
+                      className={getRowBgColor(plan, index)}
                     >
                       <TableCell className="font-medium">
                         <div className="flex items-center">
+                          {plan.is_default && (
+                            <StarIcon className="h-4 w-4 text-amber-500 mr-2 fill-amber-500" />
+                          )}
                           {plan.name}
                           {plan.is_default && (
                             <Badge className="ml-2 bg-primary/20 text-primary border-primary/30">
@@ -335,17 +468,34 @@ export function PlansTable() {
                         </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        {formatCurrency(plan.daily_deposit_limit, "BDT")}
+                        <div className="flex items-center">
+                          <PiggyBank className="h-4 w-4 text-green-600 mr-2" />
+                          {formatCurrency(plan.daily_deposit_limit, "BDT")}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        {formatCurrency(plan.daily_withdrawal_limit, "BDT")}
+                        <div className="flex items-center">
+                          <Coins className="h-4 w-4 text-amber-600 mr-2" />
+                          {formatCurrency(plan.daily_withdrawal_limit, "BDT")}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
-                        {formatCurrency(plan.daily_profit_limit, "BDT")}
+                        <div className="flex items-center">
+                          <DollarSign className="h-4 w-4 text-blue-600 mr-2" />
+                          {formatCurrency(plan.daily_profit_limit, "BDT")}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant={plan.price === 0 ? "outline" : "secondary"}
+                          className={cn(
+                            plan.price === 0
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "",
+                            plan.price > 10000
+                              ? "bg-purple-100 text-purple-800 border-purple-200"
+                              : ""
+                          )}
                         >
                           {formatCurrency(plan.price, "BDT")}
                         </Badge>
@@ -440,12 +590,21 @@ export function PlansTable() {
             </Table>
           </div>
         )}
+
+        {/* Pagination */}
+        <div className="mt-4 flex justify-center">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </div>
       </CardContent>
-      {filteredPlans.length > 0 && (
+      {filteredAndSortedPlans.length > 0 && (
         <CardFooter className="flex justify-between border-t p-4">
           <div className="text-sm text-muted-foreground">
-            {filteredPlans.length}{" "}
-            {filteredPlans.length === 1 ? "plan" : "plans"} found
+            {filteredAndSortedPlans.length}{" "}
+            {filteredAndSortedPlans.length === 1 ? "plan" : "plans"} found
           </div>
           <Button variant="outline" size="sm" onClick={handleCreatePlan}>
             <Plus className="h-4 w-4 mr-2" />

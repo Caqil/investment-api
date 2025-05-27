@@ -16,6 +16,8 @@ import { PendingActions } from "@/components/dashboard/pending-action";
 import { RecentUsers } from "@/components/users/recent-user";
 import { api } from "@/lib/api";
 import { Transaction } from "@/types/transaction";
+import { SecuritySettings } from "@/components/settings/security-settings";
+import { useSettings } from "@/hooks/use-settings";
 
 export default function DashboardPage() {
   const {
@@ -35,7 +37,8 @@ export default function DashboardPage() {
     isLoading: activitiesLoading,
     error: activitiesError,
   } = useRecentActivity();
-
+  const { settings, loading, updateSetting } = useSettings();
+  const systemSettings = settings.filter((s) => s.group === "system");
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>(
     []
   );
@@ -132,7 +135,6 @@ export default function DashboardPage() {
 
         <div className="grid gap-6 md:grid-cols-2">
           <RecentUsers users={recentUsers} loading={isLoading} />
-          {/* You can add another component here if needed */}
         </div>
       </div>
     </DashboardShell>

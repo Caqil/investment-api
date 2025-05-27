@@ -8,18 +8,21 @@ import (
 )
 
 type DeviceCheckMiddleware struct {
-	deviceService *service.DeviceService
-	userService   *service.UserService // Added userService
+	deviceService  *service.DeviceService
+	userService    *service.UserService
+	settingService *service.SettingService // Add settingService
 }
 
-// Update the constructor to include userService
+// Update the constructor to include settingService
 func NewDeviceCheckMiddleware(
 	deviceService *service.DeviceService,
 	userService *service.UserService,
+	settingService *service.SettingService, // Add this parameter
 ) *DeviceCheckMiddleware {
 	return &DeviceCheckMiddleware{
-		deviceService: deviceService,
-		userService:   userService,
+		deviceService:  deviceService,
+		userService:    userService,
+		settingService: settingService, // Assign the field
 	}
 }
 
@@ -69,7 +72,47 @@ func (m *DeviceCheckMiddleware) CheckDevice() gin.HandlerFunc {
 			return
 		}
 
-		// For regular users, enforce device verification
+		// Check if device checking is enabled
+		deviceCheckEnabled, err := m.settingService.GetSettingValueBool("enable_device_check")
+		if err != nil {
+			// Default to enabled if setting not found
+			deviceCheckEnabled = true
+		}
+
+		// If device checking is disabled, only verify that a device ID is provided
+		if !deviceCheckEnabled {
+			if deviceID == "" {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Device ID is required"})
+				return
+			}
+
+			// Check if device is virtual
+			isVirtual, err := m.deviceService.IsVirtualDevice(deviceID)
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Failed to check device"})
+				return
+			}
+			if isVirtual {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Virtual devices are not supported"})
+				return
+			}
+
+			// Auto-register device if not already registered
+			isUserDevice, _ := m.deviceService.IsDeviceRegisteredToUser(deviceID, userID)
+			if !isUserDevice {
+				_ = m.deviceService.RegisterDevice(userID, deviceID)
+			}
+
+			// Update last login time
+			_ = m.deviceService.UpdateDeviceLastLogin(deviceID)
+
+			// Add device ID to context
+			c.Set("deviceID", deviceID)
+			c.Next()
+			return
+		}
+
+		// Device checking is enabled, enforce full validation
 		if deviceID == "" {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Device ID is required"})
 			return

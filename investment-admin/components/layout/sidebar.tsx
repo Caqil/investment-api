@@ -40,6 +40,11 @@ const items = [
   { name: "News", href: "/admin/news", icon: NewspaperIcon },
   { name: "Notifications", href: "/admin/notifications", icon: Bell },
   { name: "Settings", href: "/admin/settings", icon: Settings },
+  {
+    name: "System",
+    href: "/admin/system",
+    icon: Shield,
+  },
 ];
 
 export function Sidebar({ open, onOpenChange }: SidebarProps) {

@@ -665,3 +665,11 @@ func (s *PaymentService) GetTransactionByPaymentID(paymentID int64) (*model.Tran
 func (s *PaymentService) GetAllPayments(limit, offset int) ([]*model.Payment, error) {
 	return s.paymentRepo.FindAll(limit, offset)
 }
+func (s *PaymentService) IsDepositEnabled() (bool, error) {
+	enabled, err := s.settingService.GetSettingValueBool("enable_deposits")
+	if err != nil {
+		// If there's an error reading the setting, default to true for backward compatibility
+		return true, err
+	}
+	return enabled, nil
+}

@@ -5,23 +5,8 @@ import { User } from "@/types/auth";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Eye,
-  LockIcon,
-  UnlockIcon,
-  ShieldAlertIcon,
-  ShieldCheckIcon,
-  UserX,
-} from "lucide-react";
+import { Eye, LockIcon, UnlockIcon, UserX } from "lucide-react";
 import { api } from "@/lib/api";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { UserDetailsDialog } from "./user-detail-dialog";
+import { TablePagination } from "../ui/table-pagination";
 
 interface UsersTableProps {
   users: User[];
@@ -50,11 +36,23 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalItems = users.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  // Get current page data
+  const currentUsers = users.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
   const handleViewUserDetails = (userId: number) => {
-    console.log("Opening user details dialog for user ID:", userId);
     setSelectedUserId(userId);
     setShowUserDetailsDialog(true);
   };
+
   const handleBlockUser = async () => {
     if (!actionUser) return;
 
@@ -66,19 +64,8 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
         throw new Error(response.error);
       }
 
-      // Log success
-      console.log("User blocked successfully:", actionUser.id);
-
       setShowBlockDialog(false);
-
-      // Make sure onRefresh is awaited
       await onRefresh();
-
-      // Force a state update to reflect the change immediately
-      // This is a workaround if the API refresh isn't working
-      if (actionUser) {
-        const updatedUser = { ...actionUser, is_blocked: true };
-      }
     } catch (err) {
       console.error("Error blocking user:", err);
       setError(err instanceof Error ? err.message : "Failed to block user");
@@ -87,7 +74,6 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
     }
   };
 
-  // Similarly update handleUnblockUser
   const handleUnblockUser = async () => {
     if (!actionUser) return;
 
@@ -100,11 +86,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
       }
 
       setShowUnblockDialog(false);
-
-      // Call onRefresh and wait for it to complete
       await onRefresh();
-
-      // Force state update by closing any open dialogs
       setSelectedUserId(null);
       setActionUser(null);
     } catch (err) {
@@ -136,6 +118,10 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
     }
   };
 
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   if (loading) {
     return (
       <div className="border rounded-md p-6">
@@ -159,7 +145,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
             <Eye className="h-6 w-6 text-gray-400" />
           </div>
           <h3 className="text-lg font-medium">No users found</h3>
-          <p className="text-sm   mt-1">
+          <p className="text-sm mt-1">
             There are no users matching your criteria.
           </p>
         </div>
@@ -225,9 +211,9 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
               </tr>
             </thead>
             <tbody className="divide-y">
-              {users.map((user) => (
+              {currentUsers.map((user) => (
                 <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium ">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     {user.id}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -238,46 +224,31 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
                       <div className="ml-3">
                         <div className="text-sm font-medium">{user.name}</div>
                         {user.is_admin && (
-                          <Badge
-                            variant="outline"
-                            className="bg-purple-100 text-purple-800 hover:bg-purple-100"
-                          >
-                            Admin
-                          </Badge>
+                          <Badge variant="outline">Admin</Badge>
                         )}
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {user.email}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {user.phone}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {new Intl.NumberFormat("en-US", {
                       style: "currency",
                       currency: "BDT",
                     }).format(user.balance)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {user.is_blocked ? (
-                      <Badge
-                        variant="outline"
-                        className="bg-red-100 text-red-800 hover:bg-red-100"
-                      >
-                        Blocked
-                      </Badge>
+                      <Badge variant="destructive">Blocked</Badge>
                     ) : (
-                      <Badge
-                        variant="outline"
-                        className="bg-green-100 text-green-800 hover:bg-green-100"
-                      >
-                        Active
-                      </Badge>
+                      <Badge variant="outline">Active</Badge>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm  ">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {formatDate(user.created_at)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -299,7 +270,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
                           setActionUser(user);
                           setShowUnblockDialog(true);
                         }}
-                        className="h-8 gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 ml-2"
+                        className="h-8 gap-1 ml-2"
                       >
                         <UnlockIcon className="h-4 w-4" />
                         Unblock
@@ -312,7 +283,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
                           setActionUser(user);
                           setShowBlockDialog(true);
                         }}
-                        className="h-8 gap-1 text-amber-600 hover:text-amber-700 hover:bg-amber-50 ml-2"
+                        className="h-8 gap-1 ml-2"
                       >
                         <LockIcon className="h-4 w-4" />
                         Block
@@ -326,7 +297,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
                         setActionUser(user);
                         setShowDeleteDialog(true);
                       }}
-                      className="h-8 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
+                      className="h-8 gap-1 ml-2"
                     >
                       <UserX className="h-4 w-4" />
                       Delete
@@ -337,13 +308,26 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Component */}
+        {users.length > 0 && (
+          <TablePagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            totalItems={totalItems}
+            pageSize={pageSize}
+            onPageChange={handlePageChange}
+          />
+        )}
       </div>
+
       <UserDetailsDialog
         userId={selectedUserId}
         open={showUserDetailsDialog}
         onOpenChange={setShowUserDetailsDialog}
         onAction={onRefresh}
       />
+
       {/* Block User Dialog */}
       <AlertDialog open={showBlockDialog} onOpenChange={setShowBlockDialog}>
         <AlertDialogContent>
@@ -361,7 +345,6 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
             <AlertDialogAction
               onClick={handleBlockUser}
               disabled={actionLoading}
-              className="bg-amber-600 hover:bg-amber-700"
             >
               {actionLoading ? "Blocking..." : "Block User"}
             </AlertDialogAction>
@@ -386,7 +369,6 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
             <AlertDialogAction
               onClick={handleUnblockUser}
               disabled={actionLoading}
-              className="bg-green-600 hover:bg-green-700"
             >
               {actionLoading ? "Unblocking..." : "Unblock User"}
             </AlertDialogAction>
@@ -412,7 +394,6 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
             <AlertDialogAction
               onClick={handleDeleteUser}
               disabled={actionLoading}
-              className="bg-red-600 hover:bg-red-700"
             >
               {actionLoading ? "Deleting..." : "Delete User"}
             </AlertDialogAction>

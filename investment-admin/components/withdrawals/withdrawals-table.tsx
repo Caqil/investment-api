@@ -1,51 +1,52 @@
 "use client";
 
+import { useState } from "react";
 import { Withdrawal, WithdrawalStatus } from "@/types/withdrawal";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, CheckCircle, XCircle } from "lucide-react";
+import { TablePagination } from "../ui/table-pagination";
 
 interface WithdrawalsTableProps {
   withdrawals: Withdrawal[];
   loading: boolean;
   onViewDetails: (id: number) => void;
+  onApprove?: (id: number) => void;
+  onReject?: (id: number) => void;
 }
 
 export function WithdrawalsTable({
   withdrawals,
   loading,
   onViewDetails,
+  onApprove,
+  onReject,
 }: WithdrawalsTableProps) {
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalItems = withdrawals.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  // Get current page data
+  const currentWithdrawals = withdrawals.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
   const getStatusBadge = (status: WithdrawalStatus) => {
     switch (status) {
       case WithdrawalStatus.PENDING:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100"
-          >
-            Pending
-          </Badge>
-        );
+        return <Badge variant="secondary">Pending</Badge>;
       case WithdrawalStatus.APPROVED:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-green-100 text-green-800 hover:bg-green-100"
-          >
-            Approved
-          </Badge>
-        );
+        return <Badge variant="success">Approved</Badge>;
       case WithdrawalStatus.REJECTED:
-        return (
-          <Badge
-            variant="outline"
-            className="bg-red-100 text-red-800 hover:bg-red-100"
-          >
-            Rejected
-          </Badge>
-        );
+        return <Badge variant="destructive">Rejected</Badge>;
       default:
         return <Badge variant="outline">Unknown</Badge>;
     }
@@ -133,7 +134,7 @@ export function WithdrawalsTable({
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {withdrawals.map((withdrawal) => (
+            {currentWithdrawals.map((withdrawal) => (
               <tr key={withdrawal.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                   {withdrawal.id}
@@ -166,24 +167,28 @@ export function WithdrawalsTable({
 
                   {withdrawal.status === WithdrawalStatus.PENDING && (
                     <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewDetails(withdrawal.id)}
-                        className="h-8 gap-1 text-green-600 hover:text-green-700 hover:bg-green-50 ml-2"
-                      >
-                        <CheckCircle className="h-4 w-4" />
-                        Approve
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => onViewDetails(withdrawal.id)}
-                        className="h-8 gap-1 text-red-600 hover:text-red-700 hover:bg-red-50 ml-2"
-                      >
-                        <XCircle className="h-4 w-4" />
-                        Reject
-                      </Button>
+                      {onApprove && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onApprove(withdrawal.id)}
+                          className="h-8 gap-1 ml-2"
+                        >
+                          <CheckCircle className="h-4 w-4" />
+                          Approve
+                        </Button>
+                      )}
+                      {onReject && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onReject(withdrawal.id)}
+                          className="h-8 gap-1 ml-2"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Reject
+                        </Button>
+                      )}
                     </>
                   )}
                 </td>
@@ -192,6 +197,17 @@ export function WithdrawalsTable({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Component */}
+      {withdrawals.length > 0 && (
+        <TablePagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+        />
+      )}
     </div>
   );
 }

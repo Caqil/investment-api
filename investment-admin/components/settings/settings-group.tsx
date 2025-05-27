@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { SettingsTable } from "./settings-table";
+import { SettingsList } from "./settings-list";
 import { Setting } from "@/types/setting";
 
 interface SettingsGroupProps {
@@ -58,7 +58,7 @@ export function SettingsGroup({
         </CardHeader>
         <CollapsibleContent>
           <CardContent className="pt-0">
-            <SettingsTable
+            <SettingsList
               settings={settings}
               loading={loading}
               onUpdate={onUpdate}

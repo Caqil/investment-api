@@ -30,7 +30,11 @@ func (c *PaymentController) DepositViaCoingate(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-
+	enabled, _ := c.paymentService.IsDepositEnabled()
+	if !enabled {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Deposits are currently disabled"})
+		return
+	}
 	// Get amount from request body
 	var req struct {
 		Amount float64 `json:"amount" binding:"required,min=1"`
@@ -63,7 +67,11 @@ func (c *PaymentController) DepositViaUddoktaPay(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-
+	enabled, _ := c.paymentService.IsDepositEnabled()
+	if !enabled {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Deposits are currently disabled"})
+		return
+	}
 	// Get amount from request body
 	var req struct {
 		Amount float64 `json:"amount" binding:"required,min=100"`
@@ -96,7 +104,11 @@ func (c *PaymentController) DepositViaManual(ctx *gin.Context) {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
 		return
 	}
-
+	enabled, _ := c.paymentService.IsDepositEnabled()
+	if !enabled {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "Deposits are currently disabled"})
+		return
+	}
 	// Get amount and details from request body
 	var req struct {
 		Amount            float64                `json:"amount" binding:"required,min=100"`

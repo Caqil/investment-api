@@ -102,7 +102,14 @@ func (a *App) SetupRoutes() *gin.Engine {
 	notificationController := controller.NewNotificationController(notificationService, userService)
 
 	// Initialize controllers
-	authController := controller.NewAuthController(authService, userService, deviceService, planService, notificationService)
+	authController := controller.NewAuthController(
+		authService,
+		userService,
+		deviceService,
+		planService,
+		notificationService,
+		settingService,
+	)
 	userController := controller.NewUserController(userService, bonusService, notificationService, transactionRepo)
 	paymentController := controller.NewPaymentController(paymentService)
 	planController := controller.NewPlanController(planService, userService, notificationService)
@@ -128,7 +135,11 @@ func (a *App) SetupRoutes() *gin.Engine {
 	)
 	// Initialize middleware
 	authMiddleware := middleware.NewAuthMiddleware(a.jwtService.GetJWTManager(), userRepo)
-	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(deviceService, userService)
+	deviceCheckMiddleware := middleware.NewDeviceCheckMiddleware(
+		deviceService,
+		userService,
+		settingService, // Add settingService
+	)
 	adminMiddleware := middleware.NewAdminMiddleware(userRepo)
 	userNotificationController := controller.NewUserNotificationController(notificationService)
 
@@ -260,6 +271,13 @@ func (a *App) SetupRoutes() *gin.Engine {
 		adminAPI.GET("/transactions/recent", transactionController.GetRecentTransactions)
 		adminAPI.GET("/users/:id/transactions", transactionController.GetUserTransactions)
 		// Admin payments management
+		adminAPI.GET("/payments", paymentController.GetAllPayments)
+		adminAPI.GET("/payments/stats", paymentController.GetPaymentStats)
+		adminAPI.GET("/payments/:id", paymentController.GetPaymentByID)
+		adminAPI.GET("/payments/pending", paymentController.GetPendingManualPayments)
+		adminAPI.PUT("/payments/:id/approve", paymentController.ApproveManualPayment)
+		adminAPI.PUT("/payments/:id/reject", paymentController.RejectManualPayment)
+
 		adminAPI.GET("/settings/key/:key", settingController.GetSettingByKey)
 		adminAPI.PUT("/settings/key/:key", settingController.UpdateSettingValue)
 
