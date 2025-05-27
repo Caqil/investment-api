@@ -6,7 +6,6 @@ import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Bell, Eye, Check, Trash } from "lucide-react";
-import { TablePagination } from "../ui/table-pagination";
 
 interface NotificationTableProps {
   notifications: Notification[];
@@ -202,16 +201,6 @@ export function NotificationTable({
         </table>
       </div>
 
-      {/* Pagination Component */}
-      {notifications.length > 0 && (
-        <TablePagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-        />
-      )}
     </div>
   );
 }

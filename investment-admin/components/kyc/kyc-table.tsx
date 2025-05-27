@@ -15,7 +15,6 @@ import { KYCDocument, KYCStatus, DocumentType } from "@/types/kyc";
 import { formatDate } from "@/lib/utils";
 import { FileSearch, ExternalLink } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TablePagination } from "../ui/table-pagination";
 
 interface KYCTableProps {
   documents: KYCDocument[];
@@ -191,16 +190,6 @@ export function KYCTable({ documents, loading, onViewDetails }: KYCTableProps) {
         </TableBody>
       </Table>
 
-      {/* Pagination Component */}
-      {documents.length > 0 && (
-        <TablePagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-        />
-      )}
     </div>
   );
 }

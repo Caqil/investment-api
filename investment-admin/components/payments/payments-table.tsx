@@ -6,7 +6,6 @@ import { formatDate, formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, CheckCircle, XCircle } from "lucide-react";
-import { TablePagination } from "../ui/table-pagination";
 
 interface PaymentsTableProps {
   payments: Payment[];
@@ -216,16 +215,6 @@ export function PaymentsTable({
         </table>
       </div>
 
-      {/* Pagination Component */}
-      {payments.length > 0 && (
-        <TablePagination
-          currentPage={currentPage}
-          totalPages={totalPages}
-          totalItems={totalItems}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-        />
-      )}
     </div>
   );
 }

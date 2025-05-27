@@ -16,7 +16,6 @@ import { formatDate } from "@/lib/utils";
 import { Pencil, Trash2, ExternalLink, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeleteTaskDialog } from "./delete-task-dialog";
-import { TablePagination } from "../ui/table-pagination";
 
 interface TasksTableProps {
   tasks: Task[];
@@ -207,16 +206,6 @@ export function TasksTable({
           </TableBody>
         </Table>
 
-        {/* Pagination Component */}
-        {tasks.length > 0 && (
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-          />
-        )}
       </div>
 
       {/* Delete Confirmation Dialog */}

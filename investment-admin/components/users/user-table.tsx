@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User } from "@/types/auth";
 import { formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { UserDetailsDialog } from "./user-detail-dialog";
-import { TablePagination } from "../ui/table-pagination";
 
 interface UsersTableProps {
   users: User[];
@@ -42,11 +41,29 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
   const totalItems = users.length;
   const totalPages = Math.ceil(totalItems / pageSize);
 
-  // Get current page data
-  const currentUsers = users.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
+  // Reset to page 1 if users array changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [users.length]);
+
+  // Calculate current page data - this is important!
+  const getCurrentPageData = () => {
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return users.slice(startIndex, endIndex);
+  };
+
+  const currentUsers = getCurrentPageData();
+
+  // Add console logging to debug pagination
+  console.log("UsersTable pagination:", {
+    currentPage,
+    totalPages,
+    totalItems,
+    pageSize,
+    currentUsersLength: currentUsers.length,
+    shouldShowPagination: totalPages > 1,
+  });
 
   const handleViewUserDetails = (userId: number) => {
     setSelectedUserId(userId);
@@ -119,6 +136,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
   };
 
   const handlePageChange = (page: number) => {
+    console.log("Changing to page:", page);
     setCurrentPage(page);
   };
 
@@ -308,17 +326,6 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
             </tbody>
           </table>
         </div>
-
-        {/* Pagination Component */}
-        {users.length > 0 && (
-          <TablePagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalItems={totalItems}
-            pageSize={pageSize}
-            onPageChange={handlePageChange}
-          />
-        )}
       </div>
 
       <UserDetailsDialog
