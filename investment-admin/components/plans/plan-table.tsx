@@ -54,6 +54,7 @@ import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { PlanForm } from "@/components/plans/plan-form";
+import { PaginationWrapper } from "@/components/ui/pagination-wrapper";
 
 export function PlansTable() {
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -125,6 +126,11 @@ export function PlansTable() {
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
+
+  // Reset to page 1 when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
 
   const handleEditPlan = (plan: Plan) => {
     setSelectedPlan(plan);
@@ -316,143 +322,157 @@ export function PlansTable() {
             ))}
           </div>
         ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Daily Deposit Limit
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Daily Withdrawal Limit
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    Daily Profit Limit
-                  </TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentPlans.length > 0 ? (
-                  currentPlans.map((plan) => (
-                    <TableRow
-                      key={plan.id}
-                      className={plan.is_default ? "bg-muted/50" : ""}
-                    >
-                      <TableCell className="font-medium">
-                        <div className="flex items-center">
-                          {plan.name}
-                          {plan.is_default && (
-                            <Badge className="ml-2">Default</Badge>
+          <div className="space-y-4">
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Daily Deposit Limit
+                    </TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Daily Withdrawal Limit
+                    </TableHead>
+                    <TableHead className="hidden md:table-cell">
+                      Daily Profit Limit
+                    </TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {currentPlans.length > 0 ? (
+                    currentPlans.map((plan) => (
+                      <TableRow
+                        key={plan.id}
+                        className={plan.is_default ? "bg-muted/50" : ""}
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center">
+                            {plan.name}
+                            {plan.is_default && (
+                              <Badge className="ml-2">Default</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {formatCurrency(plan.daily_deposit_limit, "BDT")}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {formatCurrency(plan.daily_withdrawal_limit, "BDT")}
+                        </TableCell>
+                        <TableCell className="hidden md:table-cell">
+                          {formatCurrency(plan.daily_profit_limit, "BDT")}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={plan.price === 0 ? "outline" : "secondary"}
+                          >
+                            {formatCurrency(plan.price, "BDT")}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {plan.is_default ? (
+                            <Badge variant="outline">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Default
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Standard</Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                disabled={isSubmitting}
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Open menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onClick={() => handleEditPlan(plan)}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Plan
+                              </DropdownMenuItem>
+                              {!plan.is_default && (
+                                <DropdownMenuItem
+                                  onClick={() => handleSetDefaultPlan(plan.id)}
+                                  disabled={isSubmitting}
+                                >
+                                  <Check className="h-4 w-4 mr-2" />
+                                  Set as Default
+                                </DropdownMenuItem>
+                              )}
+                              {!plan.is_default && (
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    setDeletePlanId(plan.id);
+                                    setShowDeleteDialog(true);
+                                  }}
+                                  className="text-destructive"
+                                  disabled={isSubmitting}
+                                >
+                                  <Trash className="h-4 w-4 mr-2" />
+                                  Delete Plan
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center py-8">
+                        <div className="flex flex-col items-center justify-center gap-2">
+                          <Info className="h-8 w-8 text-muted-foreground" />
+                          <p className="text-muted-foreground">
+                            No plans found
+                          </p>
+                          {searchQuery && (
+                            <p className="text-sm text-muted-foreground">
+                              Try adjusting your search query
+                            </p>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCreatePlan}
+                            className="mt-2"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add New Plan
+                          </Button>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {formatCurrency(plan.daily_deposit_limit, "BDT")}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {formatCurrency(plan.daily_withdrawal_limit, "BDT")}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {formatCurrency(plan.daily_profit_limit, "BDT")}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={plan.price === 0 ? "outline" : "secondary"}
-                        >
-                          {formatCurrency(plan.price, "BDT")}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {plan.is_default ? (
-                          <Badge variant="outline">
-                            <CheckCircle2 className="h-3 w-3 mr-1" />
-                            Default
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">Standard</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 w-8 p-0"
-                              disabled={isSubmitting}
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Open menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              onClick={() => handleEditPlan(plan)}
-                            >
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit Plan
-                            </DropdownMenuItem>
-                            {!plan.is_default && (
-                              <DropdownMenuItem
-                                onClick={() => handleSetDefaultPlan(plan.id)}
-                                disabled={isSubmitting}
-                              >
-                                <Check className="h-4 w-4 mr-2" />
-                                Set as Default
-                              </DropdownMenuItem>
-                            )}
-                            {!plan.is_default && (
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setDeletePlanId(plan.id);
-                                  setShowDeleteDialog(true);
-                                }}
-                                className="text-destructive"
-                                disabled={isSubmitting}
-                              >
-                                <Trash className="h-4 w-4 mr-2" />
-                                Delete Plan
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
                     </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
-                      <div className="flex flex-col items-center justify-center gap-2">
-                        <Info className="h-8 w-8 text-muted-foreground" />
-                        <p className="text-muted-foreground">No plans found</p>
-                        {searchQuery && (
-                          <p className="text-sm text-muted-foreground">
-                            Try adjusting your search query
-                          </p>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleCreatePlan}
-                          className="mt-2"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add New Plan
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
 
-           
+            {/* Pagination */}
+            {filteredPlans.length > 0 && (
+              <PaginationWrapper
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                totalItems={totalItems}
+                pageSize={pageSize}
+                className="border-t pt-4"
+              />
+            )}
           </div>
         )}
       </CardContent>

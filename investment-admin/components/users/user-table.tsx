@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { UserDetailsDialog } from "./user-detail-dialog";
+import { PaginationWrapper } from "@/components/ui/pagination-wrapper";
 
 interface UsersTableProps {
   users: User[];
@@ -37,7 +38,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
 
   // Pagination states
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const pageSize = 15;
   const totalItems = users.length;
   const totalPages = Math.ceil(totalItems / pageSize);
 
@@ -46,7 +47,7 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
     setCurrentPage(1);
   }, [users.length]);
 
-  // Calculate current page data - this is important!
+  // Calculate current page data
   const getCurrentPageData = () => {
     const startIndex = (currentPage - 1) * pageSize;
     const endIndex = startIndex + pageSize;
@@ -54,16 +55,6 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
   };
 
   const currentUsers = getCurrentPageData();
-
-  // Add console logging to debug pagination
-  console.log("UsersTable pagination:", {
-    currentPage,
-    totalPages,
-    totalItems,
-    pageSize,
-    currentUsersLength: currentUsers.length,
-    shouldShowPagination: totalPages > 1,
-  });
 
   const handleViewUserDetails = (userId: number) => {
     setSelectedUserId(userId);
@@ -136,20 +127,21 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
   };
 
   const handlePageChange = (page: number) => {
-    console.log("Changing to page:", page);
     setCurrentPage(page);
   };
 
   if (loading) {
     return (
-      <div className="border rounded-md p-6">
-        <div className="space-y-4">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="flex flex-col space-y-2">
-              <div className="h-4 bg-gray-200 rounded w-1/4"></div>
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            </div>
-          ))}
+      <div className="space-y-4">
+        <div className="border rounded-md p-6">
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex flex-col space-y-2">
+                <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -173,159 +165,171 @@ export function UsersTable({ users, loading, onRefresh }: UsersTableProps) {
 
   return (
     <>
-      <div className="border rounded-md">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y">
-            <thead>
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                >
-                  ID
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                >
-                  Name
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                >
-                  Email
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                >
-                  Phone
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                >
-                  Balance
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                >
-                  Status
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
-                >
-                  Created
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider"
-                >
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {currentUsers.map((user) => (
-                <tr key={user.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    {user.id}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
-                        {user.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium">{user.name}</div>
-                        {user.is_admin && (
-                          <Badge variant="outline">Admin</Badge>
-                        )}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {user.email}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {user.phone}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {new Intl.NumberFormat("en-US", {
-                      style: "currency",
-                      currency: "BDT",
-                    }).format(user.balance)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {user.is_blocked ? (
-                      <Badge variant="destructive">Blocked</Badge>
-                    ) : (
-                      <Badge variant="outline">Active</Badge>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {formatDate(user.created_at)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewUserDetails(user.id)}
-                      className="h-8 gap-1"
-                    >
-                      <Eye className="h-4 w-4" />
-                      Details
-                    </Button>
-
-                    {user.is_blocked ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setActionUser(user);
-                          setShowUnblockDialog(true);
-                        }}
-                        className="h-8 gap-1 ml-2"
-                      >
-                        <UnlockIcon className="h-4 w-4" />
-                        Unblock
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setActionUser(user);
-                          setShowBlockDialog(true);
-                        }}
-                        className="h-8 gap-1 ml-2"
-                      >
-                        <LockIcon className="h-4 w-4" />
-                        Block
-                      </Button>
-                    )}
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setActionUser(user);
-                        setShowDeleteDialog(true);
-                      }}
-                      className="h-8 gap-1 ml-2"
-                    >
-                      <UserX className="h-4 w-4" />
-                      Delete
-                    </Button>
-                  </td>
+      <div className="space-y-4">
+        <div className="border rounded-md">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y">
+              <thead>
+                <tr>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                  >
+                    ID
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                  >
+                    Name
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                  >
+                    Email
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                  >
+                    Phone
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                  >
+                    Balance
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                  >
+                    Status
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                  >
+                    Created
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider"
+                  >
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y">
+                {currentUsers.map((user) => (
+                  <tr key={user.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      {user.id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium">{user.name}</div>
+                          {user.is_admin && (
+                            <Badge variant="outline">Admin</Badge>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {user.email}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {user.phone}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {new Intl.NumberFormat("en-US", {
+                        style: "currency",
+                        currency: "BDT",
+                      }).format(user.balance)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {user.is_blocked ? (
+                        <Badge variant="destructive">Blocked</Badge>
+                      ) : (
+                        <Badge variant="outline">Active</Badge>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {formatDate(user.created_at)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleViewUserDetails(user.id)}
+                        className="h-8 gap-1"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Details
+                      </Button>
+
+                      {user.is_blocked ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setActionUser(user);
+                            setShowUnblockDialog(true);
+                          }}
+                          className="h-8 gap-1 ml-2"
+                        >
+                          <UnlockIcon className="h-4 w-4" />
+                          Unblock
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setActionUser(user);
+                            setShowBlockDialog(true);
+                          }}
+                          className="h-8 gap-1 ml-2"
+                        >
+                          <LockIcon className="h-4 w-4" />
+                          Block
+                        </Button>
+                      )}
+
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setActionUser(user);
+                          setShowDeleteDialog(true);
+                        }}
+                        className="h-8 gap-1 ml-2"
+                      >
+                        <UserX className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
+
+        {/* Pagination */}
+        <PaginationWrapper
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          totalItems={totalItems}
+          pageSize={pageSize}
+          className="border-t pt-4"
+        />
       </div>
 
       <UserDetailsDialog
